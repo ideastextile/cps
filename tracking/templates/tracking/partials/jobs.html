@@ -1,0 +1,56 @@
+<h3 class="text-xl font-bold mb-4 text-white">Manage Jobs</h3>
+
+<table class="min-w-full bg-white/10 backdrop-blur text-white text-sm rounded-xl overflow-hidden shadow-lg">
+  <thead class="bg-gradient-to-r from-purple-700 to-indigo-800 text-white">
+    <tr>
+      <th class="px-4 py-3">Parcel</th>
+      <th class="px-4 py-3">Driver</th>
+      <th class="px-4 py-3">Type</th>
+      <th class="px-4 py-3">Status</th>
+      <th class="px-4 py-3">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for job in jobs %}
+    <tr class="border-b border-white/10 hover:bg-white/10 transition">
+      <form method="post" action="{% url 'update_job_inline' job.id %}">
+        {% csrf_token %}
+        <td class="px-4 py-2">{{ job.parcel.tracking_number }}</td>
+
+        <td class="px-4 py-2">
+          <select name="driver" class="w-full bg-gray-800 text-white rounded px-2 py-1">
+            {% for driver in drivers %}
+              <option value="{{ driver.id }}" {% if job.driver.id == driver.id %}selected{% endif %}>
+                {{ driver.user.username }}
+              </option>
+            {% endfor %}
+          </select>
+        </td>
+
+        <td class="px-4 py-2">
+          <select name="type" class="w-full bg-gray-800 text-white rounded px-2 py-1">
+            <option value="pickup" {% if job.type == 'pickup' %}selected{% endif %}>Pickup</option>
+            <option value="delivery" {% if job.type == 'delivery' %}selected{% endif %}>Delivery</option>
+            {% comment %} <option value="return" {% if job.type == 'return' %}selected{% endif %}>Return</option> {% endcomment %}
+          </select>
+        </td>
+
+        <td class="px-4 py-2">
+          <select name="status" class="w-full bg-gray-800 text-white rounded px-2 py-1">
+            <option value="assigned" {% if job.status == 'assigned' %}selected{% endif %}>Assigned</option>
+            <option value="in_progress" {% if job.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+            <option value="completed" {% if job.status == 'completed' %}selected{% endif %}>Completed</option>
+            <option value="cancelled" {% if job.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+          </select>
+        </td>
+
+        <td class="px-4 py-2 text-center">
+          <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded shadow">
+            Save
+          </button>
+        </td>
+      </form>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

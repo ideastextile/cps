@@ -1,0 +1,65 @@
+
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="{% static 'tracking/css/dashboard.css' %}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <h1>Admin Dashboard</h1>
+        <div class="stats-cards">
+            <div class="card">
+                <h2>Total Parcels</h2>
+                <p>{{ total_parcels }}</p>
+            </div>
+            <div class="card">
+                <h2>Pending</h2>
+                <p>{{ pending_parcels }}</p>
+            </div>
+            <div class="card">
+                <h2>In Transit</h2>
+                <p>{{ in_transit_parcels }}</p>
+            </div>
+            <div class="card">
+                <h2>Delivered</h2>
+                <p>{{ delivered_parcels }}</p>
+            </div>
+        </div>
+    </div>
+
+<!-- Below existing cards in dashboard.html, paste this block -->
+<h2>Update Parcel Status</h2>
+<table border="1" cellpadding="10" cellspacing="0" style="width: 100%; background: #fff;">
+    <tr>
+        <th>ID</th>
+        <th>Customer</th>
+        <th>Current Status</th>
+        <th>Update</th>
+    </tr>
+    {% for job in parcels %}
+    <tr>
+        <td>{{ job.id }}</td>
+        <td>{{ job.customer_name }}</td>
+        <td>{{ job.status }}</td>
+        <td>
+            <form method="post" action="{% url 'update_status' job.id %}">
+                {% csrf_token %}
+                <select name="status">
+                    <option value="Pending">Pending</option>
+                    <option value="Picked">Picked</option>
+                    <option value="In Transit">In Transit</option>
+                    <option value="Delivered">Delivered</option>
+                </select>
+                <button type="submit">Update</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+
+</body>
+</html>

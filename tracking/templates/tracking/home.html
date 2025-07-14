@@ -1,0 +1,142 @@
+{% extends 'tracking/base.html' %}
+
+{% block title %}Home - ParcelTrack Pro{% endblock %}
+
+{% block content %}
+<section class="hero-section">
+    <div class="container">
+        <h1 class="hero-title">Track Your Parcels with Ease</h1>
+        <p class="hero-subtitle">Professional parcel tracking and delivery management system</p>
+        
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body p-4">
+                        <h5 class="card-title text-center mb-4">
+                            <i class="fas fa-search me-2"></i>
+                            Quick Track
+                        </h5>
+                        <form method="get" action="{% url 'track_parcel' %}">
+                            <div class="input-group">
+                                <input type="text" class="form-control" name="tracking_number" 
+                                       placeholder="Enter tracking number" required>
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search me-1"></i>
+                                    Track
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row text-center mb-5">
+            <div class="col">
+                <h2 class="text-white mb-3">Why Choose ParcelTrack Pro?</h2>
+                <p class="text-white-50">Experience the future of parcel tracking and delivery management</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body">
+                        <i class="fas fa-clock feature-icon"></i>
+                        <h5>Real-time Tracking</h5>
+                        <p class="text-muted">Track your parcels in real-time with live updates and notifications.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body">
+                        <i class="fas fa-shield-alt feature-icon"></i>
+                        <h5>Secure & Reliable</h5>
+                        <p class="text-muted">Your parcels are safe with our secure tracking and delivery system.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-4">
+                <div class="card feature-card">
+                    <div class="card-body">
+                        <i class="fas fa-mobile-alt feature-icon"></i>
+                        <h5>Mobile Friendly</h5>
+                        <p class="text-muted">Access your tracking information from any device, anywhere.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body p-5">
+                        <h3 class="mb-4">How It Works</h3>
+                        <div class="tracking-timeline">
+                            <div class="timeline-item">
+                                <h6>1. Book Your Parcel</h6>
+                                <p class="text-muted">Schedule a pickup with detailed parcel information.</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h6>2. Driver Collection</h6>
+                                <p class="text-muted">Our driver collects and scans your parcel.</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h6>3. Real-time Updates</h6>
+                                <p class="text-muted">Track your parcel's journey with live updates.</p>
+                            </div>
+                            <div class="timeline-item">
+                                <h6>4. Safe Delivery</h6>
+                                <p class="text-muted">Receive your parcel with photo proof and signature.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="text-center text-white">
+                    <i class="fas fa-truck" style="font-size: 8rem; opacity: 0.8;"></i>
+                    <h4 class="mt-4">Fast & Reliable Delivery</h4>
+                    <p class="lead">Professional drivers with real-time tracking capabilities</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if not user.is_authenticated %}
+<section class="py-5">
+    <div class="container text-center">
+        <div class="card">
+            <div class="card-body p-5">
+                <h3 class="mb-4">Ready to Get Started?</h3>
+                <p class="lead mb-4">Join thousands of satisfied customers who trust ParcelTrack Pro</p>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <a href="{% url 'register_page' %}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-user-plus me-2"></i>
+                        Register Now
+                    </a>
+                    <a href="{% url 'login_page' %}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-sign-in-alt me-2"></i>
+                        Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+

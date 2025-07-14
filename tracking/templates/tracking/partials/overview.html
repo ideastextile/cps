@@ -1,0 +1,85 @@
+<!-- Parcel Stats Cards -->
+<!-- Parcel Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+  
+  <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl text-center p-6 text-white hover:scale-[1.03] transition duration-300">
+    <div class="text-blue-400 text-3xl mb-2">
+      <i class="fas fa-box"></i>
+    </div>
+    <h3 class="text-2xl font-bold">{{ total_parcels }}</h3>
+    <p class="text-gray-300 mt-1">Total Parcels</p>
+  </div>
+
+  <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl text-center p-6 text-white hover:scale-[1.03] transition duration-300">
+    <div class="text-yellow-400 text-3xl mb-2">
+      <i class="fas fa-clock"></i>
+    </div>
+    <h3 class="text-2xl font-bold">{{ pending_parcels }}</h3>
+    <p class="text-gray-300 mt-1">Pending Pickup</p>
+  </div>
+
+  <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl text-center p-6 text-white hover:scale-[1.03] transition duration-300">
+    <div class="text-cyan-400 text-3xl mb-2">
+      <i class="fas fa-truck"></i>
+    </div>
+    <h3 class="text-2xl font-bold">{{ in_transit_parcels }}</h3>
+    <p class="text-gray-300 mt-1">In Transit</p>
+  </div>
+
+  <div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl text-center p-6 text-white hover:scale-[1.03] transition duration-300">
+    <div class="text-green-400 text-3xl mb-2">
+      <i class="fas fa-check-circle"></i>
+    </div>
+    <h3 class="text-2xl font-bold">{{ delivered_parcels }}</h3>
+    <p class="text-gray-300 mt-1">Delivered</p>
+  </div>
+
+</div>
+
+<!-- Parcel Chart Section -->
+<!-- Parcel Chart Section (3D Tailwind UI) -->
+<div class="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl shadow-xl text-white p-6 mb-10">
+  <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+    <i class="fas fa-chart-bar text-purple-400 text-xl"></i> Parcel Status Overview
+  </h3>
+  
+  <!-- ✅ Chart Canvas Container -->
+  <div class="w-full max-w-2xl mx-auto">
+    <canvas id="parcelChart" class="!w-full !h-[600px]"></canvas>
+  </div>
+</div>
+
+
+
+<!-- Chart Script -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const ctx = document.getElementById('parcelChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: ['Pending', 'In Transit', 'Delivered'],
+            datasets: [{
+                label: 'Parcels',
+                data: [{{ pending_parcels }}, {{ in_transit_parcels }}, {{ delivered_parcels }}],
+                backgroundColor: ['#f0ad4e', '#5bc0de', '#5cb85c'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Parcel Status Summary' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+});
+</script>

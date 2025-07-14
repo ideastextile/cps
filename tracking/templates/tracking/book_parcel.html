@@ -1,0 +1,252 @@
+{% extends 'tracking/base.html' %}
+
+{% block title %}Book Parcel - ParcelTrack Pro{% endblock %}
+
+{% block content %}
+<section class="py-12 bg-gray-50">
+  <div class="max-w-5xl mx-auto px-4">
+    <div class="bg-white rounded-lg shadow-lg p-8">
+      <div class="text-center mb-8">
+        <div class="text-blue-600 text-4xl mb-2">
+          <i class="fas fa-box"></i>
+        </div>
+        <h2 class="text-2xl font-semibold text-gray-800">Book a Parcel Collection</h2>
+        <p class="text-gray-500">Schedule a pickup for your parcel</p>
+      </div>
+
+      <form id="bookingForm" method="POST">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Pickup Details -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+              <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>Pickup Details
+            </h3>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Pickup Country</label>
+              <select id="pickup_country" class="mt-1 w-full border rounded px-3 py-2">
+                <option value="">Select Country</option>
+                <option value="uk">United Kingdom</option>
+                <option value="us">United States</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Pickup City</label>
+              <select id="pickup_city" class="mt-1 w-full border rounded px-3 py-2">
+                <option value="">Select City</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Pickup Postcode</label>
+              <div class="flex space-x-2">
+                <input type="text" id="pickup_postcode" class="flex-1 border rounded px-3 py-2" placeholder="e.g., EC1A1BB">
+                <button type="button" onclick="fetchAddress('pickup')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                  Find
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Pickup Address</label>
+              <textarea id="pickup_address" name="pickup_address" rows="4" class="w-full border rounded px-3 py-2" required></textarea>
+            </div>
+          </div>
+
+          <!-- Delivery Details -->
+          <div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-4">
+              <i class="fas fa-shipping-fast mr-2 text-green-600"></i>Delivery Details
+            </h3>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Delivery Country</label>
+              <select id="delivery_country" class="mt-1 w-full border rounded px-3 py-2">
+                <option value="">Select Country</option>
+                <option value="uk">United Kingdom</option>
+                <option value="us">United States</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Delivery City</label>
+              <select id="delivery_city" class="mt-1 w-full border rounded px-3 py-2">
+                <option value="">Select City</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Delivery Postcode</label>
+              <div class="flex space-x-2">
+                <input type="text" id="delivery_postcode" class="flex-1 border rounded px-3 py-2" placeholder="e.g., E14BB">
+                <button type="button" onclick="fetchAddress('delivery')" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                  Find
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-600">Delivery Address</label>
+              <textarea id="delivery_address" name="delivery_address" rows="4" class="w-full border rounded px-3 py-2" required></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recipient Info -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-600">Recipient Name *</label>
+            <input type="text" id="recipient_name" name="recipient_name" class="mt-1 w-full border rounded px-3 py-2" required>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-gray-600">Recipient Phone *</label>
+            <input type="tel" id="recipient_phone" name="recipient_phone" class="mt-1 w-full border rounded px-3 py-2" required>
+          </div>
+        </div>
+
+        <!-- Parcel Info -->
+        <div class="mt-6">
+          <label class="block text-sm font-medium text-gray-600">Parcel Description *</label>
+          <textarea id="description" name="description" rows="2" class="w-full border rounded px-3 py-2" required></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+          <div>
+            <label class="block text-sm font-medium text-gray-600">Weight (kg) *</label>
+            <input type="number" step="0.1" min="0.1" id="weight" name="weight" class="mt-1 w-full border rounded px-3 py-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-600">Dimensions (L x W x H cm) *</label>
+            <input type="text" id="dimensions" name="dimensions" class="mt-1 w-full border rounded px-3 py-2" placeholder="e.g., 30 x 20 x 15" required>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <label class="block text-sm font-medium text-gray-600">Delivery Instructions</label>
+          <textarea id="delivery_instructions" name="delivery_instructions" rows="2" class="w-full border rounded px-3 py-2" placeholder="Any special instructions (optional)"></textarea>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="mt-8">
+          <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded text-lg font-semibold">
+            <i class="fas fa-calendar-plus mr-2"></i>
+            Book Collection
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  const cityData = {
+    uk: ["London", "Manchester", "Liverpool", "Leeds", "Birmingham"],
+    us: ["New York", "Los Angeles", "Chicago"]
+  };
+
+  function loadCities(countryId, cityId) {
+    const country = document.getElementById(countryId).value;
+    const citySelect = document.getElementById(cityId);
+    citySelect.innerHTML = "<option value=''>Select City</option>";
+
+    if (cityData[country]) {
+      cityData[country].forEach(city => {
+        const option = document.createElement("option");
+        option.value = city;
+        option.text = city;
+        citySelect.appendChild(option);
+      });
+    }
+  }
+
+  document.getElementById("pickup_country").addEventListener("change", () =>
+    loadCities("pickup_country", "pickup_city")
+  );
+  document.getElementById("delivery_country").addEventListener("change", () =>
+    loadCities("delivery_country", "delivery_city")
+  );
+
+  function fetchAddress(type) {
+    const postcode = document.getElementById(`${type}_postcode`).value.trim().replace(/\s/g, "");
+    const addressSelect = document.getElementById(`${type}_address`);
+
+    if (!postcode) {
+      alert("Please enter a postcode");
+      return;
+    }
+
+    fetch(`https://api.postcodes.io/postcodes/${postcode}`)
+      .then(response => response.json())
+      .then(data => {
+        if (data.status === 200) {
+          const res = data.result;
+          const address = `${res.parish}, ${res.admin_district}, ${res.region}, ${res.country}`;
+          addressSelect.innerHTML = `<option value="${address}">${address}</option>`;
+        } else {
+          addressSelect.innerHTML = `<option>No address found</option>`;
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        addressSelect.innerHTML = `<option>Error fetching address</option>`;
+      });
+  }
+</script>
+
+<script>
+document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const formData = new FormData(this);
+    const data = Object.fromEntries(formData);
+
+    try {
+        const response = await fetch('/api/parcels/book/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            const labelUrl = result.label_url + '?print=1'; // this prints label
+            const printWindow = window.open(labelUrl, '_blank');
+
+            // Wait for the new window to load before printing and redirecting
+            const timer = setInterval(() => {
+                if (printWindow.document.readyState === 'complete') {
+                    clearInterval(timer);
+                    printWindow.focus();
+                    printWindow.print();
+
+                    // After a slight delay, redirect main window to "My Parcels"
+                    setTimeout(() => {
+                        window.location.href = '/my-parcels/';
+                    }, 1500);
+                }
+            }, 500);
+        } else {
+            let errorMessage = 'Booking failed:\n';
+            for (const [field, errors] of Object.entries(result)) {
+                errorMessage += `${field}: ${errors.join(', ')}\n`;
+            }
+            alert(errorMessage);
+        }
+    } catch (error) {
+        alert('Booking failed: ' + error.message);
+    }
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,46 @@
+<!-- tracking/partials/driver_locations.html -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Live Driver Map</h5>
+  </div>
+  <div class="card-body p-0">
+    <div id="map" style="height: 500px;">
+
+          
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet JS & Map Init -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  const map = L.map('map').setView([30.3753, 69.3451], 5); // Center Pakistan
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  {% for driver in drivers %}
+    {% if driver.current_latitude and driver.current_longitude %}
+      L.marker([{{ driver.current_latitude }}, {{ driver.current_longitude }}])
+        .addTo(map)
+        .bindPopup("Driver: {{ driver.user.username }}");
+    {% endif %}
+  {% endfor %}
+</script>
+<script>
+  const map = L.map('map').setView([30.3753, 69.3451], 5);  // Pakistan center
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  {% for driver in drivers %}
+    {% if driver.current_latitude and driver.current_longitude %}
+      L.marker([{{ driver.current_latitude }}, {{ driver.current_longitude }}])
+        .addTo(map)
+        .bindPopup("<b>Driver:</b> {{ driver.user.username|escapejs }}");
+    {% endif %}
+  {% endfor %}
+</script>

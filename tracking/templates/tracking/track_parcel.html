@@ -1,0 +1,202 @@
+{% extends 'tracking/base.html' %}
+
+{% block title %}Track Parcel - ParcelTrack Pro{% endblock %}
+
+{% block content %}
+<section class="py-5">
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-md-10">
+        <div class="card shadow-sm">
+          <div class="card-body p-5">
+            <div class="text-center mb-4">
+              <i class="fas fa-search fa-3x text-primary mb-3"></i>
+              <h3>Track Your Parcel</h3>
+              <p class="text-muted">Enter your tracking number to get real-time updates</p>
+            </div>
+
+            <form id="trackingForm">
+              <div class="input-group mb-4">
+                <input type="text" class="form-control form-control-lg" id="tracking_number" name="tracking_number"
+                  placeholder="Enter tracking number" value="{{ request.GET.tracking_number }}" required />
+                <button class="btn btn-primary btn-lg" type="submit">
+                  <i class="fas fa-search me-1"></i> Track
+                </button>
+              </div>
+            </form>
+
+            <!-- Results Area -->
+            <div id="trackingResults" style="display: none;">
+              <hr class="my-4" />
+              <div id="parcelInfo"></div>
+              <div id="trackingTimeline" class="mt-4"></div>
+            </div>
+
+            <!-- No Results -->
+            <div id="noResults" style="display: none;">
+              <hr class="my-4" />
+              <div class="text-center">
+                <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
+                <h5>Parcel Not Found</h5>
+                <p class="text-muted">Please check your tracking number and try again.</p>
+              </div>
+            </div>
+
+            <!-- Not Available Yet -->
+            <div id="notAvailableYet" style="display: none;">
+              <hr class="my-4" />
+              <div class="text-center">
+                <i class="fas fa-clock fa-3x text-info mb-3"></i>
+                <h5>Tracking Not Available Yet</h5>
+                <p class="text-muted">Tracking will be enabled once the parcel is out for delivery.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet CDN -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+
+<script>
+document.getElementById('trackingForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+
+  const trackingNumber = document.getElementById('tracking_number').value.trim();
+  if (!trackingNumber) return;
+
+  try {
+    const response = await fetch(`/api/public/track/${trackingNumber}/`);
+    if (response.ok) {
+      const parcel = await response.json();
+      displayTrackingResults(parcel);
+    } else if (response.status === 403) {
+      showNotAvailableYet();
+    } else {
+      showNoResults();
+    }
+  } catch (error) {
+    showNoResults();
+  }
+});
+
+function displayTrackingResults(parcel) {
+  document.getElementById('noResults').style.display = 'none';
+  document.getElementById('trackingResults').style.display = 'block';
+  document.getElementById('notAvailableYet').style.display = 'none';
+
+  const parcelInfo = document.getElementById('parcelInfo');
+  parcelInfo.innerHTML = `
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <h5>Parcel Information</h5>
+        <p><strong>Tracking Number:</strong> ${parcel.tracking_number}</p>
+        <p><strong>Status:</strong> <span class="badge bg-secondary">${formatStatus(parcel.status)}</span></p>
+        <p><strong>Recipient:</strong> ${parcel.recipient_name}</p>
+      </div>
+      <div class="col-md-6">
+        <h5>Delivery Details</h5>
+        <p><strong>From:</strong> ${parcel.pickup_address}</p>
+        <p><strong>To:</strong> ${parcel.delivery_address}</p>
+        <p><strong>Booked:</strong> ${formatDate(parcel.booked_at)}</p>
+        ${parcel.expected_delivery_date ? `<p><strong>Expected:</strong> ${formatDate(parcel.expected_delivery_date)}</p>` : ''}
+      </div>
+    </div>
+  `;
+
+  // Map Showing Driver's Location (with live updates)
+  if (parcel.status === "out_for_delivery" && parcel.driver_latitude && parcel.driver_longitude) {
+    const mapDiv = document.createElement('div');
+    mapDiv.id = 'driverMap';
+    mapDiv.style.height = '300px';
+    mapDiv.className = 'mb-4 rounded shadow-sm border';
+    parcelInfo.appendChild(mapDiv);
+
+    const map = L.map('driverMap').setView([parcel.driver_latitude, parcel.driver_longitude], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    let marker = L.marker([parcel.driver_latitude, parcel.driver_longitude])
+      .addTo(map)
+      .bindPopup("Driver's Current Location")
+      .openPopup();
+
+    // ⏱️ Auto-refresh location every 10 seconds
+    setInterval(async () => {
+      try {
+        const res = await fetch(`/api/public/track/${parcel.tracking_number}/`);
+        if (res.ok) {
+          const updated = await res.json();
+          if (updated.driver_latitude && updated.driver_longitude) {
+            marker.setLatLng([updated.driver_latitude, updated.driver_longitude]);
+            map.setView([updated.driver_latitude, updated.driver_longitude]);
+          }
+        }
+      } catch (err) {
+        console.warn('Location update failed:', err);
+      }
+    }, 10000);
+  }
+
+  // Tracking Timeline
+  const timeline = document.getElementById('trackingTimeline');
+  timeline.innerHTML = `
+    <h5>Tracking History</h5>
+    <div class="tracking-timeline">
+      ${parcel.tracking_events.map(event => `
+        <div class="border rounded p-3 mb-3">
+          <div class="d-flex justify-content-between">
+            <div>
+              <h6>${event.status_update}</h6>
+              <p class="text-muted mb-1">${event.notes}</p>
+              ${event.location ? `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${event.location}</small>` : ''}
+            </div>
+            <small class="text-muted">${formatDateTime(event.timestamp)}</small>
+          </div>
+          ${event.image ? `<img src="${event.image}" class="img-thumbnail mt-2" style="max-width: 200px;">` : ''}
+          ${event.signature ? `<img src="${event.signature}" class="img-thumbnail mt-2" style="max-width: 200px;">` : ''}
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function showNoResults() {
+  document.getElementById('trackingResults').style.display = 'none';
+  document.getElementById('noResults').style.display = 'block';
+  document.getElementById('notAvailableYet').style.display = 'none';
+}
+
+function showNotAvailableYet() {
+  document.getElementById('trackingResults').style.display = 'none';
+  document.getElementById('noResults').style.display = 'none';
+  document.getElementById('notAvailableYet').style.display = 'block';
+}
+
+function formatStatus(status) {
+  return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatDate(dateString) {
+  return new Date(dateString).toLocaleDateString();
+}
+
+function formatDateTime(dateString) {
+  return new Date(dateString).toLocaleString();
+}
+
+// Auto Track if pre-filled in URL
+window.addEventListener('load', function () {
+  const trackingNumber = document.getElementById('tracking_number').value;
+  if (trackingNumber) {
+    document.getElementById('trackingForm').dispatchEvent(new Event('submit'));
+  }
+});
+</script>
+{% endblock %}

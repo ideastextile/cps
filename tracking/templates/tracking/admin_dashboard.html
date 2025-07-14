@@ -1,0 +1,69 @@
+{% extends 'tracking/base.html' %}
+
+
+{% block title %}Admin Dashboard{% endblock %}
+{% block header %}  {# ✅ This block allows the header to be included from base.html #}
+  {{ block.super }}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex">
+  <!-- Sidebar -->
+  <div class="bg-dark text-white p-3" style="min-width: 220px; min-height: 100vh;">
+    <h5 class="text-white">Dashboard</h5>
+    <ul class="nav flex-column mt-4">
+      <li class="nav-item">
+        <a class="nav-link text-white active" data-bs-toggle="tab" href="#overview"><i class="fas fa-chart-bar me-2"></i>Parcel Overview</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link text-white" data-bs-toggle="tab" href="#parcels"><i class="fas fa-boxes me-2"></i>Parcels</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link text-white" data-bs-toggle="tab" href="#drivers"><i class="fas fa-users me-2"></i>Drivers</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link text-white" data-bs-toggle="tab" href="#jobs"><i class="fas fa-tasks me-2"></i>Jobs</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link text-white" data-bs-toggle="tab" href="#tracking"><i class="fas fa-map-marker-alt me-2"></i>Tracking</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link text-white" data-bs-toggle="tab" href="#location"><i class="fas fa-location-arrow me-2"></i>Driver Location</a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- Main Content Area -->
+  <div class="tab-content flex-grow-1 p-4">
+    <div class="tab-pane fade show active" id="overview">
+      {% include 'tracking/partials/overview.html' %}
+    </div>
+    <div class="tab-pane fade" id="parcels">
+      {% include 'tracking/partials/parcels.html' %}
+    </div>
+    <div class="tab-pane fade" id="drivers">
+      {% include 'tracking/partials/drivers.html' %}
+    </div>
+    <div class="tab-pane fade" id="jobs">
+      {% include 'tracking/partials/jobs.html' %}
+    </div>
+    <div class="tab-pane fade" id="tracking">
+      {% include 'tracking/partials/tracking_status.html' %}
+    </div>
+    <div class="tab-pane fade" id="location">
+       {% include 'tracking/partials/driver_locations.html' %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', function () {
+      document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+<!-- tracking/partials/drivers.html -->
+<div class="card">
+  <div class="card-header">
+    <h5 class="mb-0">All Drivers</h5>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for driver in drivers %}
+        <tr>
+          <td>{{ driver.user.get_full_name }}</td>
+          <td>{{ driver.user.email }}</td>
+          <td>
+            {% if driver.is_available %}
+              <span class="badge bg-success">Available</span>
+            {% else %}
+              <span class="badge bg-secondary">Busy</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
