@@ -23,9 +23,20 @@ class User(AbstractUser):
 class Driver(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     vehicle_details = models.TextField(blank=True)
+    
+    # Enhanced location tracking fields
     current_latitude = models.FloatField(null=True, blank=True)
     current_longitude = models.FloatField(null=True, blank=True)
+    last_location_update = models.DateTimeField(null=True, blank=True)
+    location_accuracy = models.FloatField(null=True, blank=True, help_text="GPS accuracy in meters")
+    
+    # Status and availability
     is_available = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False, help_text="Currently on duty")
+    
+    # Route and performance tracking
+    total_distance_today = models.FloatField(default=0.0, help_text="Distance in kilometers")
+    last_route_update = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Driver: {self.user.username}"
@@ -112,9 +123,21 @@ class Job(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
-    # ✅ New fields
+    # Enhanced route tracking fields
     estimated_arrival_time = models.DateTimeField(null=True, blank=True)
     location_access_enabled = models.BooleanField(default=False)
+    
+    # New route management fields
+    route_started_at = models.DateTimeField(null=True, blank=True)
+    route_completed_at = models.DateTimeField(null=True, blank=True)
+    estimated_distance = models.FloatField(null=True, blank=True, help_text="Distance in kilometers")
+    actual_distance = models.FloatField(null=True, blank=True, help_text="Distance in kilometers")
+    route_waypoints = models.JSONField(default=list, blank=True, help_text="Store route coordinates")
+    
+    # Customer tracking permissions
+    customer_tracking_enabled = models.BooleanField(default=False)
+    tracking_start_time = models.DateTimeField(null=True, blank=True)
+    tracking_end_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.job_type} job for {self.parcel.tracking_number} - {self.status}"
@@ -135,7 +158,72 @@ class Notification(models.Model):
         return f"Notification for {self.user.username}: {self.title}"
 
 
+class DriverLocationHistory(models.Model):
+    """Model to store historical location data for route tracking and analytics"""
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='location_history')
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    timestamp = models.DateTimeField(default=timezone.now)
+    accuracy = models.FloatField(null=True, blank=True, help_text="GPS accuracy in meters")
+    speed = models.FloatField(null=True, blank=True, help_text="Speed in km/h")
+    heading = models.FloatField(null=True, blank=True, help_text="Direction in degrees")
+    
+    # Associated job information
+    current_job = models.ForeignKey(Job, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['driver', '-timestamp']),
+            models.Index(fields=['current_job', '-timestamp']),
+        ]
 
+    def __str__(self):
+        return f"Location for {self.driver.user.username} at {self.timestamp}"
+
+
+class Route(models.Model):
+    """Model for managing and storing route information"""
+    ROUTE_STATUS = (
+        ('planned', 'Planned'),
+        ('active', 'Active'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    )
+    
+    driver = models.ForeignKey(Driver, on_delete=models.CASCADE, related_name='routes')
+    route_name = models.CharField(max_length=100)
+    route_area = models.CharField(max_length=50, help_text="e.g., PE21, Route 21")
+    depot = models.CharField(max_length=50, help_text="e.g., Depot 3")
+    
+    # Route planning
+    planned_stops = models.JSONField(default=list, help_text="List of stop coordinates")
+    estimated_duration = models.DurationField(null=True, blank=True)
+    estimated_distance = models.FloatField(null=True, blank=True, help_text="Distance in kilometers")
+    
+    # Route execution
+    status = models.CharField(max_length=20, choices=ROUTE_STATUS, default='planned')
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    actual_duration = models.DurationField(null=True, blank=True)
+    actual_distance = models.FloatField(null=True, blank=True, help_text="Distance in kilometers")
+    
+    # Route optimization
+    optimized_order = models.JSONField(default=list, blank=True)
+    optimization_score = models.FloatField(null=True, blank=True)
+    
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['driver', 'status']),
+            models.Index(fields=['route_area']),
+        ]
+
+    def __str__(self):
+        return f"Route {self.route_name} - {self.route_area} ({self.status})"
 
 
 class AboutSection(models.Model):

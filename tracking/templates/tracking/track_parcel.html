@@ -1,6 +1,79 @@
 {% extends 'tracking/base.html' %}
+{% load static %}
 
 {% block title %}Track Parcel - ParcelTrack Pro{% endblock %}
+
+{% block extra_css %}
+<style>
+  #customer-map {
+    height: 400px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  
+  .tracking-timeline {
+    position: relative;
+  }
+  
+  .tracking-timeline::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+  }
+  
+  .timeline-item {
+    position: relative;
+    padding-left: 50px;
+    margin-bottom: 20px;
+  }
+  
+  .timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 14px;
+    top: 8px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #007bff;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #007bff;
+  }
+  
+  .timeline-item.completed::before {
+    background: #28a745;
+    box-shadow: 0 0 0 2px #28a745;
+  }
+  
+  .live-tracking-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+  }
+  
+  .tracking-status {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  .status-order_placed { background-color: #6c757d; color: white; }
+  .status-awaiting_pickup { background-color: #ffc107; color: black; }
+  .status-collected { background-color: #17a2b8; color: white; }
+  .status-in_transit { background-color: #007bff; color: white; }
+  .status-out_for_delivery { background-color: #fd7e14; color: white; }
+  .status-delivered { background-color: #28a745; color: white; }
+  .status-failed_delivery { background-color: #dc3545; color: white; }
+  .status-cancelled { background-color: #6c757d; color: white; }
+</style>
+{% endblock %}
 
 {% block content %}
 <section class="py-5">
@@ -24,11 +97,14 @@
                 </button>
               </div>
             </form>
+            <canvas id="myCanvas" width="100%" height="300px"></canvas>
+
 
             <!-- Results Area -->
             <div id="trackingResults" style="display: none;">
               <hr class="my-4" />
               <div id="parcelInfo"></div>
+              <div id="liveTrackingSection" style="display: none;"></div>
               <div id="trackingTimeline" class="mt-4"></div>
             </div>
 
@@ -61,16 +137,28 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Leaflet CDN -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
-
 <script>
+  window.onload = function () {
+    const canvas = document.getElementById("myCanvas");
+    if (canvas) {
+        const ctx = canvas.getContext("2d");
+        // drawing code
+    } else {
+        console.warn("Canvas not found!");
+    }
+};</script
+<script src="{% static 'tracking/js/maps.js' %}"></script>
+<script>
+let customerMap = null;
+let currentTrackingNumber = null;
+
 document.getElementById('trackingForm').addEventListener('submit', async function(e) {
   e.preventDefault();
 
   const trackingNumber = document.getElementById('tracking_number').value.trim();
   if (!trackingNumber) return;
+
+  currentTrackingNumber = trackingNumber;
 
   try {
     const response = await fetch(`/api/public/track/${trackingNumber}/`);
@@ -78,16 +166,18 @@ document.getElementById('trackingForm').addEventListener('submit', async functio
       const parcel = await response.json();
       displayTrackingResults(parcel);
     } else if (response.status === 403) {
-      showNotAvailableYet();
+      const errorData = await response.json();
+      showNotAvailableYet(errorData.error);
     } else {
       showNoResults();
     }
   } catch (error) {
+    console.error('Tracking error:', error);
     showNoResults();
   }
 });
 
-function displayTrackingResults(parcel) {
+async function displayTrackingResults(parcel) {
   document.getElementById('noResults').style.display = 'none';
   document.getElementById('trackingResults').style.display = 'block';
   document.getElementById('notAvailableYet').style.display = 'none';
@@ -96,13 +186,13 @@ function displayTrackingResults(parcel) {
   parcelInfo.innerHTML = `
     <div class="row mb-4">
       <div class="col-md-6">
-        <h5>Parcel Information</h5>
+        <h5><i class="fas fa-box me-2"></i>Parcel Information</h5>
         <p><strong>Tracking Number:</strong> ${parcel.tracking_number}</p>
-        <p><strong>Status:</strong> <span class="badge bg-secondary">${formatStatus(parcel.status)}</span></p>
+        <p><strong>Status:</strong> <span class="tracking-status status-${parcel.status}">${formatStatus(parcel.status)}</span></p>
         <p><strong>Recipient:</strong> ${parcel.recipient_name}</p>
       </div>
       <div class="col-md-6">
-        <h5>Delivery Details</h5>
+        <h5><i class="fas fa-truck me-2"></i>Delivery Details</h5>
         <p><strong>From:</strong> ${parcel.pickup_address}</p>
         <p><strong>To:</strong> ${parcel.delivery_address}</p>
         <p><strong>Booked:</strong> ${formatDate(parcel.booked_at)}</p>
@@ -111,56 +201,117 @@ function displayTrackingResults(parcel) {
     </div>
   `;
 
-  // Map Showing Driver's Location (with live updates)
-  if (parcel.status === "out_for_delivery" && parcel.driver_latitude && parcel.driver_longitude) {
-    const mapDiv = document.createElement('div');
-    mapDiv.id = 'driverMap';
-    mapDiv.style.height = '300px';
-    mapDiv.className = 'mb-4 rounded shadow-sm border';
-    parcelInfo.appendChild(mapDiv);
+  // Check for live tracking availability
+  await checkLiveTracking(parcel.tracking_number);
 
-    const map = L.map('driverMap').setView([parcel.driver_latitude, parcel.driver_longitude], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  // Display tracking timeline
+  displayTrackingTimeline(parcel.tracking_events);
+}
 
-    let marker = L.marker([parcel.driver_latitude, parcel.driver_longitude])
-      .addTo(map)
-      .bindPopup("Driver's Current Location")
-      .openPopup();
-
-    // ⏱️ Auto-refresh location every 10 seconds
-    setInterval(async () => {
-      try {
-        const res = await fetch(`/api/public/track/${parcel.tracking_number}/`);
-        if (res.ok) {
-          const updated = await res.json();
-          if (updated.driver_latitude && updated.driver_longitude) {
-            marker.setLatLng([updated.driver_latitude, updated.driver_longitude]);
-            map.setView([updated.driver_latitude, updated.driver_longitude]);
-          }
-        }
-      } catch (err) {
-        console.warn('Location update failed:', err);
-      }
-    }, 10000);
+async function checkLiveTracking(trackingNumber) {
+  try {
+    const response = await fetch(`/api/customer/track/${trackingNumber}/location/`);
+    const data = await response.json();
+    
+    if (data.tracking_available && data.driver_location) {
+      displayLiveTracking(data);
+    } else {
+      hideLiveTracking(data.message);
+    }
+  } catch (error) {
+    console.error('Live tracking check failed:', error);
+    hideLiveTracking('Live tracking is currently unavailable');
   }
+}
 
-  // Tracking Timeline
+function displayLiveTracking(trackingData) {
+  const liveTrackingSection = document.getElementById('liveTrackingSection');
+  liveTrackingSection.style.display = 'block';
+  
+  liveTrackingSection.innerHTML = `
+    <div class="card live-tracking-card mb-4">
+      <div class="card-body">
+        <h5 class="card-title">
+          <i class="fas fa-satellite-dish me-2"></i>Live Driver Tracking
+          <span class="badge bg-success ms-2">ACTIVE</span>
+        </h5>
+        <div class="row">
+          <div class="col-md-8">
+            <div id="customer-map" data-tracking-number="${currentTrackingNumber}"></div>
+          </div>
+          <div class="col-md-4">
+            <div id="tracking-info">
+              <div class="mb-3">
+                <h6><i class="fas fa-info-circle me-2"></i>Delivery Status</h6>
+                <p class="mb-1"><strong>Status:</strong> ${formatStatus(trackingData.parcel_status)}</p>
+                <p class="mb-1"><strong>Driver Status:</strong> ${formatStatus(trackingData.job_info.status)}</p>
+                <p class="mb-1"><strong>Job Type:</strong> ${formatStatus(trackingData.job_info.job_type)}</p>
+              </div>
+              
+              <div class="mb-3">
+                <h6><i class="fas fa-clock me-2"></i>Timing</h6>
+                <p class="mb-1"><strong>Last Update:</strong></p>
+                <small>${formatDateTime(trackingData.driver_location.last_update)}</small>
+                ${trackingData.job_info.estimated_arrival ? `
+                  <p class="mb-1 mt-2"><strong>Estimated Arrival:</strong></p>
+                  <small>${formatDateTime(trackingData.job_info.estimated_arrival)}</small>
+                ` : ''}
+              </div>
+              
+              <div class="mb-3">
+                <h6><i class="fas fa-map-marker-alt me-2"></i>Location</h6>
+                <p class="mb-1"><strong>Accuracy:</strong> ${trackingData.driver_location.accuracy ? Math.round(trackingData.driver_location.accuracy) + 'm' : 'Unknown'}</p>
+                <small class="text-light">Updates automatically every minute</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Initialize customer tracking map
+  setTimeout(() => {
+    if (document.getElementById('customer-map')) {
+      customerMap = new CustomerTrackingMap('customer-map', currentTrackingNumber);
+    }
+  }, 100);
+}
+
+function hideLiveTracking(message) {
+  const liveTrackingSection = document.getElementById('liveTrackingSection');
+  liveTrackingSection.style.display = 'block';
+  
+  liveTrackingSection.innerHTML = `
+    <div class="alert alert-info">
+      <h6><i class="fas fa-info-circle me-2"></i>Live Tracking Status</h6>
+      <p class="mb-0">${message}</p>
+    </div>
+  `;
+}
+
+function displayTrackingTimeline(events) {
   const timeline = document.getElementById('trackingTimeline');
   timeline.innerHTML = `
-    <h5>Tracking History</h5>
+    <h5><i class="fas fa-history me-2"></i>Tracking History</h5>
     <div class="tracking-timeline">
-      ${parcel.tracking_events.map(event => `
-        <div class="border rounded p-3 mb-3">
-          <div class="d-flex justify-content-between">
-            <div>
-              <h6>${event.status_update}</h6>
-              <p class="text-muted mb-1">${event.notes}</p>
-              ${event.location ? `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${event.location}</small>` : ''}
+      ${events.map((event, index) => `
+        <div class="timeline-item ${index === 0 ? 'completed' : ''}">
+          <div class="card border-0 shadow-sm">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="card-title mb-1">${event.status_update}</h6>
+                  <p class="card-text text-muted mb-1">${event.notes}</p>
+                  ${event.location ? `<small class="text-muted"><i class="fas fa-map-marker-alt me-1"></i>${event.location}</small>` : ''}
+                  ${event.created_by_name ? `<br><small class="text-muted"><i class="fas fa-user me-1"></i>Updated by: ${event.created_by_name}</small>` : ''}
+                </div>
+                <small class="text-muted">${formatDateTime(event.timestamp)}</small>
+              </div>
+              ${event.image ? `<img src="${event.image}" class="img-thumbnail mt-2" style="max-width: 200px;" alt="Delivery proof">` : ''}
+              ${event.signature ? `<img src="${event.signature}" class="img-thumbnail mt-2" style="max-width: 200px;" alt="Delivery signature">` : ''}
             </div>
-            <small class="text-muted">${formatDateTime(event.timestamp)}</small>
           </div>
-          ${event.image ? `<img src="${event.image}" class="img-thumbnail mt-2" style="max-width: 200px;">` : ''}
-          ${event.signature ? `<img src="${event.signature}" class="img-thumbnail mt-2" style="max-width: 200px;">` : ''}
         </div>
       `).join('')}
     </div>
@@ -173,10 +324,17 @@ function showNoResults() {
   document.getElementById('notAvailableYet').style.display = 'none';
 }
 
-function showNotAvailableYet() {
+function showNotAvailableYet(message = 'Tracking will be enabled once the parcel is out for delivery.') {
   document.getElementById('trackingResults').style.display = 'none';
   document.getElementById('noResults').style.display = 'none';
-  document.getElementById('notAvailableYet').style.display = 'block';
+  const notAvailableDiv = document.getElementById('notAvailableYet');
+  notAvailableDiv.style.display = 'block';
+  
+  // Update the message
+  const messageP = notAvailableDiv.querySelector('p');
+  if (messageP) {
+    messageP.textContent = message;
+  }
 }
 
 function formatStatus(status) {
@@ -198,5 +356,24 @@ window.addEventListener('load', function () {
     document.getElementById('trackingForm').dispatchEvent(new Event('submit'));
   }
 });
+
+// Load Google Maps API
+function loadGoogleMaps() {
+  if (typeof google === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&callback=initGoogleMaps';
+    script.async = true;
+    script.defer = true;
+    
+    window.initGoogleMaps = function() {
+      console.log('Google Maps API loaded for customer tracking');
+    };
+    
+    document.head.appendChild(script);
+  }
+}
+
+// Load Google Maps when page loads
+document.addEventListener('DOMContentLoaded', loadGoogleMaps);
 </script>
 {% endblock %}

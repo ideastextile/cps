@@ -1,0 +1,388 @@
+{% extends 'tracking/base.html' %}
+{% load static %}
+
+{% block title %}Driver Location Simulator{% endblock %}
+
+{% block extra_css %}
+<style>
+  #simulator-map {
+    height: 500px;
+    width: 100%;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  }
+  
+  .simulator-controls {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+  }
+  
+  .status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  
+  .status-indicator.connected {
+    background-color: #28a745;
+  }
+  
+  .status-indicator.disconnected {
+    background-color: #dc3545;
+  }
+  
+  .location-info {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-header">
+          <h5 class="card-title mb-0">
+            <i class="fas fa-map me-2"></i>Driver Location Simulator
+          </h5>
+        </div>
+        <div class="card-body p-0">
+          <div id="simulator-map"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="simulator-controls">
+        <h6><i class="fas fa-cogs me-2"></i>Simulation Controls</h6>
+        
+        <div class="mb-3">
+          <label class="form-label">Select Driver</label>
+          <select class="form-select" id="driverSelect">
+            <option value="">Loading drivers...</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Simulation Mode</label>
+          <select class="form-select" id="simulationMode">
+            <option value="manual">Manual Click</option>
+            <option value="route">Follow Route</option>
+            <option value="random">Random Movement</option>
+          </select>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Update Frequency</label>
+          <select class="form-select" id="updateFrequency">
+            <option value="5">Every 5 seconds</option>
+            <option value="10" selected>Every 10 seconds</option>
+            <option value="30">Every 30 seconds</option>
+            <option value="60">Every minute</option>
+          </select>
+        </div>
+        
+        <div class="d-grid gap-2">
+          <button class="btn btn-success" id="startSimulation">
+            <i class="fas fa-play me-2"></i>Start Simulation
+          </button>
+          <button class="btn btn-danger" id="stopSimulation" disabled>
+            <i class="fas fa-stop me-2"></i>Stop Simulation
+          </button>
+        </div>
+        
+        <hr>
+        
+        <div class="location-info">
+          <h6>Connection Status</h6>
+          <p class="mb-1">
+            <span class="status-indicator disconnected" id="connectionStatus"></span>
+            <span id="connectionText">Disconnected</span>
+          </p>
+          
+          <h6 class="mt-3">Current Location</h6>
+          <p class="mb-1"><strong>Latitude:</strong> <span id="currentLat">-</span></p>
+          <p class="mb-1"><strong>Longitude:</strong> <span id="currentLng">-</span></p>
+          <p class="mb-1"><strong>Last Update:</strong> <span id="lastUpdate">-</span></p>
+          
+          <h6 class="mt-3">Statistics</h6>
+          <p class="mb-1"><strong>Updates Sent:</strong> <span id="updateCount">0</span></p>
+          <p class="mb-1"><strong>Errors:</strong> <span id="errorCount">0</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+class DriverLocationSimulator {
+  constructor() {
+    this.map = null;
+    this.currentMarker = null;
+    this.selectedDriver = null;
+    this.simulationInterval = null;
+    this.isSimulating = false;
+    this.updateCount = 0;
+    this.errorCount = 0;
+    this.currentPosition = { lat: 51.5074, lng: -0.1278 }; // Default to London
+    
+    this.initializeMap();
+    this.loadDrivers();
+    this.bindEvents();
+  }
+  
+  initializeMap() {
+    // Initialize with a default location
+    this.map = new google.maps.Map(document.getElementById('simulator-map'), {
+      zoom: 12,
+      center: this.currentPosition,
+      mapTypeId: 'roadmap'
+    });
+    
+    // Add click listener for manual mode
+    this.map.addListener('click', (event) => {
+      if (document.getElementById('simulationMode').value === 'manual' && this.selectedDriver) {
+        this.updateDriverLocation(event.latLng.lat(), event.latLng.lng());
+      }
+    });
+  }
+  
+  async loadDrivers() {
+    try {
+      const response = await fetch('/api/admin/drivers/locations/');
+      if (response.ok) {
+        const data = await response.json();
+        const driverSelect = document.getElementById('driverSelect');
+        
+        driverSelect.innerHTML = '<option value="">Select a driver</option>';
+        data.drivers.forEach(driver => {
+          const option = document.createElement('option');
+          option.value = driver.driver_id;
+          option.textContent = `${driver.username} (${driver.is_available ? 'Available' : 'Busy'})`;
+          driverSelect.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load drivers:', error);
+    }
+  }
+  
+  bindEvents() {
+    document.getElementById('driverSelect').addEventListener('change', (e) => {
+      this.selectedDriver = e.target.value;
+      if (this.selectedDriver) {
+        this.loadDriverCurrentLocation();
+      }
+    });
+    
+    document.getElementById('startSimulation').addEventListener('click', () => {
+      this.startSimulation();
+    });
+    
+    document.getElementById('stopSimulation').addEventListener('click', () => {
+      this.stopSimulation();
+    });
+    
+    document.getElementById('updateFrequency').addEventListener('change', () => {
+      if (this.isSimulating) {
+        this.stopSimulation();
+        this.startSimulation();
+      }
+    });
+  }
+  
+  async loadDriverCurrentLocation() {
+    if (!this.selectedDriver) return;
+    
+    try {
+      const response = await fetch(`/api/driver/${this.selectedDriver}/status/`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.current_latitude && data.current_longitude) {
+          this.currentPosition = {
+            lat: data.current_latitude,
+            lng: data.current_longitude
+          };
+          
+          this.map.setCenter(this.currentPosition);
+          this.updateMarker();
+          this.updateLocationDisplay();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load driver location:', error);
+    }
+  }
+  
+  startSimulation() {
+    if (!this.selectedDriver) {
+      alert('Please select a driver first');
+      return;
+    }
+    
+    this.isSimulating = true;
+    document.getElementById('startSimulation').disabled = true;
+    document.getElementById('stopSimulation').disabled = false;
+    
+    const frequency = parseInt(document.getElementById('updateFrequency').value) * 1000;
+    const mode = document.getElementById('simulationMode').value;
+    
+    this.updateConnectionStatus(true);
+    
+    if (mode === 'route' || mode === 'random') {
+      this.simulationInterval = setInterval(() => {
+        this.simulateMovement(mode);
+      }, frequency);
+    }
+  }
+  
+  stopSimulation() {
+    this.isSimulating = false;
+    document.getElementById('startSimulation').disabled = false;
+    document.getElementById('stopSimulation').disabled = true;
+    
+    if (this.simulationInterval) {
+      clearInterval(this.simulationInterval);
+      this.simulationInterval = null;
+    }
+    
+    this.updateConnectionStatus(false);
+  }
+  
+  simulateMovement(mode) {
+    let newLat, newLng;
+    
+    if (mode === 'random') {
+      // Random movement within a small radius
+      const radius = 0.01; // Approximately 1km
+      const angle = Math.random() * 2 * Math.PI;
+      const distance = Math.random() * radius;
+      
+      newLat = this.currentPosition.lat + (distance * Math.cos(angle));
+      newLng = this.currentPosition.lng + (distance * Math.sin(angle));
+    } else if (mode === 'route') {
+      // Simulate following a route (simple linear movement)
+      const step = 0.001; // Small step
+      newLat = this.currentPosition.lat + (Math.random() - 0.5) * step;
+      newLng = this.currentPosition.lng + (Math.random() - 0.5) * step;
+    }
+    
+    this.updateDriverLocation(newLat, newLng);
+  }
+  
+  async updateDriverLocation(lat, lng) {
+    if (!this.selectedDriver) return;
+    
+    try {
+      const response = await fetch('/api/driver/location/update/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': this.getCSRFToken()
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          driver_id: this.selectedDriver,
+          latitude: lat,
+          longitude: lng,
+          accuracy: Math.random() * 10 + 5, // Random accuracy between 5-15m
+          speed: Math.random() * 50, // Random speed up to 50 km/h
+          heading: Math.random() * 360 // Random heading
+        })
+      });
+      
+      if (response.ok) {
+        this.currentPosition = { lat, lng };
+        this.updateMarker();
+        this.updateLocationDisplay();
+        this.updateCount++;
+        document.getElementById('updateCount').textContent = this.updateCount;
+      } else {
+        this.errorCount++;
+        document.getElementById('errorCount').textContent = this.errorCount;
+        console.error('Failed to update location:', response.statusText);
+      }
+    } catch (error) {
+      this.errorCount++;
+      document.getElementById('errorCount').textContent = this.errorCount;
+      console.error('Error updating location:', error);
+    }
+  }
+  
+  updateMarker() {
+    if (this.currentMarker) {
+      this.currentMarker.setMap(null);
+    }
+    
+    this.currentMarker = new google.maps.Marker({
+      position: this.currentPosition,
+      map: this.map,
+      title: 'Simulated Driver Location',
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 8,
+        fillColor: '#007bff',
+        fillOpacity: 0.8,
+        strokeWeight: 2,
+        strokeColor: '#ffffff'
+      }
+    });
+  }
+  
+  updateLocationDisplay() {
+    document.getElementById('currentLat').textContent = this.currentPosition.lat.toFixed(6);
+    document.getElementById('currentLng').textContent = this.currentPosition.lng.toFixed(6);
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString();
+  }
+  
+  updateConnectionStatus(connected) {
+    const statusIndicator = document.getElementById('connectionStatus');
+    const statusText = document.getElementById('connectionText');
+    
+    if (connected) {
+      statusIndicator.className = 'status-indicator connected';
+      statusText.textContent = 'Connected';
+    } else {
+      statusIndicator.className = 'status-indicator disconnected';
+      statusText.textContent = 'Disconnected';
+    }
+  }
+  
+  getCSRFToken() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  }
+}
+
+// Initialize simulator when Google Maps is loaded
+function initDriverSimulator() {
+  window.driverSimulator = new DriverLocationSimulator();
+}
+
+// Load Google Maps API
+function loadGoogleMaps() {
+  if (typeof google === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY_HERE&callback=initDriverSimulator';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  } else {
+    initDriverSimulator();
+  }
+}
+
+// Load Google Maps when page loads
+document.addEventListener('DOMContentLoaded', loadGoogleMaps);
+</script>
+{% endblock %}
+

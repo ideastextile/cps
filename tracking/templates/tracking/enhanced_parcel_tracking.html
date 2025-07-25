@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Your Parcel - CPS</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #1f2937;
+            --light-color: #f8fafc;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+
+        .tracking-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px auto;
+            max-width: 1200px;
+            overflow: hidden;
+        }
+
+        .tracking-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tracking-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .tracking-title {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .tracking-subtitle {
+            position: relative;
+            z-index: 1;
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .search-section {
+            padding: 2rem;
+            background: white;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .search-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-input {
+            position: relative;
+        }
+
+        .search-input input {
+            width: 100%;
+            padding: 1rem 1.5rem 1rem 3rem;
+            border: 2px solid var(--border-color);
+            border-radius: 50px;
+            font-size: 1.1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .search-input input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .search-input i {
+            position: absolute;
+            left: 1.25rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--primary-color);
+            font-size: 1.2rem;
+        }
+
+        .search-btn {
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            margin-top: 1rem;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .search-btn:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        .tracking-content {
+            padding: 2rem;
+            background: white;
+        }
+
+        .parcel-info {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .parcel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .tracking-number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .status-order_placed { background: rgba(107, 114, 128, 0.1); color: #6b7280; }
+        .status-awaiting_pickup { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-collected { background: rgba(59, 130, 246, 0.1); color: #3b82f6; }
+        .status-in_transit { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; }
+        .status-out_for_delivery { background: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+        .status-delivered { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+        .status-failed_delivery { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+        .parcel-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .detail-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .detail-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .tracking-timeline {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-header {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--dark-color);
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 2rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 0.75rem;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 2rem;
+            padding-left: 2rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -0.5rem;
+            top: 0.25rem;
+            width: 1rem;
+            height: 1rem;
+            border-radius: 50%;
+            background: var(--primary-color);
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px var(--primary-color);
+        }
+
+        .timeline-item.completed::before {
+            background: var(--success-color);
+            box-shadow: 0 0 0 2px var(--success-color);
+        }
+
+        .timeline-content {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-title {
+            font-weight: 600;
+            color: var(--dark-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-time {
+            font-size: 0.875rem;
+            color: #6b7280;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-description {
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .live-tracking {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        .live-tracking-header {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .live-tracking-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--dark-color);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        #trackingMap {
+            height: 400px;
+            width: 100%;
+        }
+
+        .driver-info {
+            padding: 1.5rem;
+            background: #f8fafc;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .driver-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .driver-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 1.25rem;
+        }
+
+        .driver-details h4 {
+            margin: 0;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+
+        .driver-details p {
+            margin: 0;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .status-connected {
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+        }
+
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .no-tracking {
+            text-align: center;
+            padding: 3rem;
+            color: #6b7280;
+        }
+
+        .no-tracking i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        @media (max-width: 768px) {
+            .tracking-container {
+                margin: 10px;
+            }
+            
+            .tracking-header {
+                padding: 1.5rem;
+            }
+            
+            .tracking-title {
+                font-size: 2rem;
+            }
+            
+            .parcel-details {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .parcel-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status status-disconnected" style="display: none;">
+        <i class="fas fa-wifi"></i> Connecting...
+    </div>
+
+    <div class="tracking-container">
+        <!-- Header -->
+        <div class="tracking-header">
+            <h1 class="tracking-title">
+                <i class="fas fa-search-location"></i>
+                Track Your Parcel
+            </h1>
+            <p class="tracking-subtitle">Real-time tracking with live location updates</p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="search-section">
+            <form class="search-form" id="trackingForm">
+                <div class="search-input">
+                    <i class="fas fa-barcode"></i>
+                    <input type="text" id="trackingNumber" placeholder="Enter your tracking number" required>
+                </div>
+                <button type="submit" class="search-btn">
+                    <i class="fas fa-search"></i>
+                    Track Parcel
+                </button>
+            </form>
+        </div>
+
+        <!-- Tracking Content -->
+        <div class="tracking-content" id="trackingContent" style="display: none;">
+            <!-- Parcel Information -->
+            <div class="parcel-info" id="parcelInfo">
+                <!-- Content will be populated by JavaScript -->
+            </div>
+
+            <!-- Tracking Timeline -->
+            <div class="tracking-timeline">
+                <div class="timeline-header">
+                    <i class="fas fa-history"></i>
+                    Tracking History
+                </div>
+                <div class="timeline" id="trackingTimeline">
+                    <!-- Timeline items will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Live Tracking Map -->
+            <div class="live-tracking" id="liveTracking" style="display: none;">
+                <div class="live-tracking-header">
+                    <h3 class="live-tracking-title">
+                        <i class="fas fa-map-marker-alt"></i>
+                        Live Tracking
+                    </h3>
+                </div>
+                <div id="trackingMap"></div>
+                <div class="driver-info" id="driverInfo">
+                    <!-- Driver information will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div class="loading-spinner" id="loadingSpinner" style="display: none;">
+            <div class="spinner"></div>
+        </div>
+
+        <!-- No Results -->
+        <div class="no-tracking" id="noResults" style="display: none;">
+            <i class="fas fa-search"></i>
+            <h3>No tracking information found</h3>
+            <p>Please check your tracking number and try again.</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        class ParcelTracker {
+            constructor() {
+                this.map = null;
+                this.websocket = null;
+                this.currentTracking = null;
+                this.driverMarker = null;
+                this.routePolyline = null;
+                
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                
+                // Check if tracking number is in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const trackingNumber = urlParams.get('tracking');
+                if (trackingNumber) {
+                    document.getElementById('trackingNumber').value = trackingNumber;
+                    this.trackParcel(trackingNumber);
+                }
+            }
+
+            bindEvents() {
+                document.getElementById('trackingForm').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const trackingNumber = document.getElementById('trackingNumber').value.trim();
+                    if (trackingNumber) {
+                        this.trackParcel(trackingNumber);
+                    }
+                });
+            }
+
+            async trackParcel(trackingNumber) {
+                this.showLoading();
+                
+                try {
+                    const response = await fetch(`/api/public/track/${trackingNumber}/`);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        this.displayTrackingInfo(data);
+                        this.currentTracking = trackingNumber;
+                        
+                        // Initialize live tracking if available
+                        if (data.current_driver && data.current_driver.location) {
+                            this.initializeLiveTracking(data);
+                        }
+                    } else {
+                        this.showNoResults();
+                    }
+                } catch (error) {
+                    console.error('Tracking error:', error);
+                    this.showNoResults();
+                }
+            }
+
+            showLoading() {
+                document.getElementById('trackingContent').style.display = 'none';
+                document.getElementById('noResults').style.display = 'none';
+                document.getElementById('loadingSpinner').style.display = 'block';
+            }
+
+            hideLoading() {
+                document.getElementById('loadingSpinner').style.display = 'none';
+            }
+
+            showNoResults() {
+                this.hideLoading();
+                document.getElementById('trackingContent').style.display = 'none';
+                document.getElementById('noResults').style.display = 'block';
+            }
+
+            displayTrackingInfo(data) {
+                this.hideLoading();
+                document.getElementById('trackingContent').style.display = 'block';
+                document.getElementById('noResults').style.display = 'none';
+
+                // Display parcel information
+                this.displayParcelInfo(data);
+                
+                // Display tracking timeline
+                this.displayTrackingTimeline(data.tracking_events);
+            }
+
+            displayParcelInfo(data) {
+                const parcelInfoEl = document.getElementById('parcelInfo');
+                
+                const expectedDelivery = data.expected_delivery ? 
+                    new Date(data.expected_delivery).toLocaleDateString() : 'Not specified';
+                
+                parcelInfoEl.innerHTML = `
+                    <div class="parcel-header">
+                        <div class="tracking-number">#${data.tracking_number}</div>
+                        <div class="status-badge status-${data.status}">${this.formatStatus(data.status)}</div>
+                    </div>
+                    
+                    <div class="parcel-details">
+                        <div class="detail-item">
+                            <div class="detail-label">Recipient</div>
+                            <div class="detail-value">${data.recipient_name}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Pickup Address</div>
+                            <div class="detail-value">${data.pickup_address}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Delivery Address</div>
+                            <div class="detail-value">${data.delivery_address}</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Expected Delivery</div>
+                            <div class="detail-value">${expectedDelivery}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            displayTrackingTimeline(events) {
+                const timelineEl = document.getElementById('trackingTimeline');
+                
+                if (!events || events.length === 0) {
+                    timelineEl.innerHTML = '<p class="text-muted">No tracking events available.</p>';
+                    return;
+                }
+
+                timelineEl.innerHTML = events.map((event, index) => {
+                    const eventTime = new Date(event.timestamp).toLocaleString();
+                    const isCompleted = index < events.length - 1 || event.status_update.includes('delivered');
+                    
+                    return `
+                        <div class="timeline-item ${isCompleted ? 'completed' : ''}">
+                            <div class="timeline-content">
+                                <div class="timeline-title">${event.status_update}</div>
+                                <div class="timeline-time">${eventTime}</div>
+                                ${event.location ? `<div class="timeline-description">Location: ${event.location}</div>` : ''}
+                                ${event.notes ? `<div class="timeline-description">${event.notes}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            initializeLiveTracking(data) {
+                if (!data.current_driver || !data.current_driver.location) {
+                    return;
+                }
+
+                document.getElementById('liveTracking').style.display = 'block';
+                
+                // Initialize map
+                this.initializeMap(data.current_driver.location);
+                
+                // Display driver information
+                this.displayDriverInfo(data.current_driver);
+                
+                // Initialize WebSocket for real-time updates
+                this.initializeWebSocket(data.tracking_number);
+            }
+
+            initializeMap(location) {
+                if (this.map) {
+                    this.map.remove();
+                }
+
+                this.map = L.map('trackingMap').setView([location.latitude, location.longitude], 13);
+                
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+
+                // Add driver marker
+                this.driverMarker = L.marker([location.latitude, location.longitude])
+                    .addTo(this.map)
+                    .bindPopup('Driver Location')
+                    .openPopup();
+            }
+
+            displayDriverInfo(driver) {
+                const driverInfoEl = document.getElementById('driverInfo');
+                const lastUpdate = driver.location.last_update ? 
+                    new Date(driver.location.last_update).toLocaleTimeString() : 'Unknown';
+                
+                driverInfoEl.innerHTML = `
+                    <div class="driver-card">
+                        <div class="driver-avatar">${driver.name.charAt(0).toUpperCase()}</div>
+                        <div class="driver-details">
+                            <h4>${driver.name}</h4>
+                            <p>Last updated: ${lastUpdate}</p>
+                            ${driver.phone ? `<p>Contact: ${driver.phone}</p>` : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            initializeWebSocket(trackingNumber) {
+                if (this.websocket) {
+                    this.websocket.close();
+                }
+
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/tracking/parcel/${trackingNumber}/`;
+                
+                this.websocket = new WebSocket(wsUrl);
+                
+                this.websocket.onopen = () => {
+                    this.updateConnectionStatus(true);
+                };
+                
+                this.websocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(data);
+                };
+                
+                this.websocket.onclose = () => {
+                    this.updateConnectionStatus(false);
+                };
+                
+                this.websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.updateConnectionStatus(false);
+                };
+            }
+
+            handleWebSocketMessage(data) {
+                if (data.type === 'parcel_update') {
+                    // Refresh tracking information
+                    this.trackParcel(this.currentTracking);
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                const statusEl = document.getElementById('connectionStatus');
+                if (connected) {
+                    statusEl.className = 'connection-status status-connected';
+                    statusEl.innerHTML = '<i class="fas fa-wifi"></i> Live tracking active';
+                    statusEl.style.display = 'block';
+                } else {
+                    statusEl.className = 'connection-status status-disconnected';
+                    statusEl.innerHTML = '<i class="fas fa-wifi"></i> Connection lost';
+                    statusEl.style.display = 'block';
+                }
+                
+                // Hide after 3 seconds if connected
+                if (connected) {
+                    setTimeout(() => {
+                        statusEl.style.display = 'none';
+                    }, 3000);
+                }
+            }
+
+            formatStatus(status) {
+                const statusMap = {
+                    'order_placed': 'Order Placed',
+                    'awaiting_pickup': 'Awaiting Pickup',
+                    'collected': 'Collected',
+                    'in_transit': 'In Transit',
+                    'out_for_delivery': 'Out for Delivery',
+                    'delivered': 'Delivered',
+                    'failed_delivery': 'Failed Delivery',
+                    'cancelled': 'Cancelled'
+                };
+                return statusMap[status] || status;
+            }
+        }
+
+        // Initialize tracker when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new ParcelTracker();
+        });
+    </script>
+</body>
+</html>
+

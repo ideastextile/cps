@@ -1,6 +1,13 @@
 from django.urls import path
 from . import views
 from .views import UpdateLocationView, update_job_inline
+from .api_views import (
+    DriverLocationUpdateAPIView, AdminDriverLocationsAPIView, DriverRouteHistoryAPIView,
+    CustomerTrackingAPIView, EnableCustomerTrackingAPIView, DriverLocationWebhookAPIView,
+    RouteOptimizationAPIView, get_driver_status, toggle_driver_active_status,
+    get_active_drivers, get_driver_details, get_driver_route, update_driver_status,
+    get_tracking_analytics, get_parcel_tracking_public
+)
 
 
 urlpatterns = [
@@ -28,6 +35,28 @@ urlpatterns = [
     path('jobs/<int:job_id>/scan_parcel/', views.ScanParcelView.as_view(), name='scan_parcel'),
     path('jobs/<int:job_id>/complete_delivery/', views.CompleteDeliveryView.as_view(), name='complete_delivery'),
     path('driver/update_location/', views.UpdateLocationView.as_view(), name='update_location'),
+
+    # Real-time tracking API endpoints
+    path('api/driver/location/update/', DriverLocationUpdateAPIView.as_view(), name='api_driver_location_update'),
+    path('api/driver/location/webhook/', DriverLocationWebhookAPIView.as_view(), name='api_driver_location_webhook'),
+    path('api/admin/drivers/locations/', AdminDriverLocationsAPIView.as_view(), name='api_admin_driver_locations'),
+    path('api/driver/<int:driver_id>/route-history/', DriverRouteHistoryAPIView.as_view(), name='api_driver_route_history'),
+    path('api/driver/<int:driver_id>/status/', get_driver_status, name='api_driver_status'),
+    path('api/driver/<int:driver_id>/toggle-active/', toggle_driver_active_status, name='api_toggle_driver_active'),
+    path('api/customer/track/<str:tracking_number>/location/', CustomerTrackingAPIView.as_view(), name='api_customer_tracking'),
+    path('api/admin/job/<int:job_id>/enable-tracking/', EnableCustomerTrackingAPIView.as_view(), name='api_enable_customer_tracking'),
+    path('api/route/optimize/', RouteOptimizationAPIView.as_view(), name='api_route_optimization'),
+    
+    # New enhanced real-time tracking endpoints
+    path('api/admin/drivers/active/', get_active_drivers, name='api_get_active_drivers'),
+    path('api/admin/driver/<int:driver_id>/details/', get_driver_details, name='api_get_driver_details'),
+    path('api/admin/driver/<int:driver_id>/route/', get_driver_route, name='api_get_driver_route'),
+    path('api/admin/driver/<int:driver_id>/status/update/', update_driver_status, name='api_update_driver_status'),
+    path('api/admin/analytics/', get_tracking_analytics, name='api_get_tracking_analytics'),
+    path('api/public/track/<str:tracking_number>/', get_parcel_tracking_public, name='api_get_parcel_tracking_public'),
+    
+    # Driver simulator for testing
+    path('simulator/', views.DriverSimulatorView.as_view(), name='driver_simulator'),
 
     # Notifications
     path('notifications/', views.NotificationsView.as_view(), name='notifications'),
@@ -58,6 +87,25 @@ urlpatterns = [
     path('label/<int:parcel_id>/', views.print_label, name='print_label'),
 
 
+    # Enhanced parcel tracking and delivery management
+    path('enhanced-tracking/', views.enhanced_parcel_tracking, name='enhanced_parcel_tracking'),
+    path('delivery-management/', views.delivery_management_dashboard, name='delivery_management_dashboard'),
+    
+    # Enhanced delivery API endpoints
+    path('api/job/<int:job_id>/start-route/', views.start_job_route, name='api_start_job_route'),
+    path('api/job/<int:job_id>/complete-enhanced/', views.complete_delivery_enhanced, name='api_complete_delivery_enhanced'),
+    path('api/job/<int:job_id>/report-issue/', views.report_delivery_issue, name='api_report_delivery_issue'),
+    path('api/driver/performance/', views.get_driver_performance, name='api_get_driver_performance'),
+    path('api/job/<int:job_id>/enable-tracking-enhanced/', views.enable_customer_tracking_enhanced, name='api_enable_customer_tracking_enhanced'),
+    
+    # Live tracking and enhanced admin interfaces
+    path('live-tracking/', views.live_tracking_dashboard, name='live_tracking_dashboard'),
+    path('enhanced-admin/', views.enhanced_admin_dashboard, name='enhanced_admin_dashboard'),
+    path('driver-management/', views.driver_management, name='driver_management'),
+    path('route-management/', views.route_management, name='route_management'),
+    path('parcel-tracking-management/', views.parcel_tracking_management, name='parcel_tracking_management'),
+    path('tracking-analytics/', views.tracking_analytics, name='tracking_analytics'),
+    
     #website urls
     
 

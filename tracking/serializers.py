@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import User, Driver, Parcel, TrackingEvent, Job, Notification
+from .models import User, Driver, Parcel, TrackingEvent, Job, Notification, DriverLocationHistory, Route
 
 
 
@@ -129,16 +129,96 @@ class ParcelTrackingSerializer(serializers.ModelSerializer):
 class DriverLocationUpdateSerializer(serializers.Serializer):
     latitude = serializers.FloatField()
     longitude = serializers.FloatField()
+    accuracy = serializers.FloatField(required=False, allow_null=True)
+    speed = serializers.FloatField(required=False, allow_null=True)
+    heading = serializers.FloatField(required=False, allow_null=True)
 
-    def get_driver_latitude(self, obj):
-        if obj.status == 'out_for_delivery' and obj.current_driver:
-            return obj.current_driver.current_latitude
+    def validate_latitude(self, value):
+        if not -90 <= value <= 90:
+            raise serializers.ValidationError("Latitude must be between -90 and 90 degrees")
+        return value
+    
+    def validate_longitude(self, value):
+        if not -180 <= value <= 180:
+            raise serializers.ValidationError("Longitude must be between -180 and 180 degrees")
+        return value
+    
+    def validate_accuracy(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Accuracy must be a positive number")
+        return value
+    
+    def validate_speed(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError("Speed must be a positive number")
+        return value
+    
+    def validate_heading(self, value):
+        if value is not None and not 0 <= value <= 360:
+            raise serializers.ValidationError("Heading must be between 0 and 360 degrees")
+        return value
+
+
+class DriverLocationHistorySerializer(serializers.ModelSerializer):
+    driver_name = serializers.CharField(source='driver.user.username', read_only=True)
+    job_tracking_number = serializers.CharField(source='current_job.parcel.tracking_number', read_only=True)
+
+    class Meta:
+        model = DriverLocationHistory
+        fields = ('id', 'driver', 'driver_name', 'latitude', 'longitude', 'timestamp', 
+                 'accuracy', 'speed', 'heading', 'current_job', 'job_tracking_number')
+
+
+class RouteSerializer(serializers.ModelSerializer):
+    driver_name = serializers.CharField(source='driver.user.username', read_only=True)
+
+    class Meta:
+        model = Route
+        fields = ('id', 'driver', 'driver_name', 'route_name', 'route_area', 'depot',
+                 'planned_stops', 'estimated_duration', 'estimated_distance', 'status',
+                 'started_at', 'completed_at', 'actual_duration', 'actual_distance',
+                 'optimized_order', 'optimization_score', 'created_at', 'updated_at')
+
+
+class EnhancedDriverSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    current_job = serializers.SerializerMethodField()
+    location_status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Driver
+        fields = ('user', 'vehicle_details', 'current_latitude', 'current_longitude', 
+                 'last_location_update', 'location_accuracy', 'is_available', 'is_active',
+                 'total_distance_today', 'current_job', 'location_status')
+
+    def get_current_job(self, obj):
+        current_job = obj.jobs.filter(status__in=['assigned', 'accepted', 'en_route']).first()
+        if current_job:
+            return {
+                'id': current_job.id,
+                'parcel_tracking': current_job.parcel.tracking_number,
+                'job_type': current_job.job_type,
+                'status': current_job.status,
+                'customer_tracking_enabled': current_job.customer_tracking_enabled
+            }
         return None
 
-    def get_driver_longitude(self, obj):
-        if obj.status == 'out_for_delivery' and obj.current_driver:
-            return obj.current_driver.current_longitude
-        return None
+    def get_location_status(self, obj):
+        if not obj.current_latitude or not obj.current_longitude:
+            return 'no_location'
+        
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        if obj.last_location_update:
+            time_diff = timezone.now() - obj.last_location_update
+            if time_diff < timedelta(minutes=5):
+                return 'recent'
+            elif time_diff < timedelta(minutes=30):
+                return 'stale'
+            else:
+                return 'old'
+        return 'unknown'
 
 class DeliveryCompletionSerializer(serializers.Serializer):
     notes = serializers.CharField(required=False, allow_blank=True)

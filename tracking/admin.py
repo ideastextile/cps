@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User, Driver, Parcel, TrackingEvent, Job, Notification ,AboutSection
+from .models import User, Driver, Parcel, TrackingEvent, Job, Notification, AboutSection, DriverLocationHistory, Route
 
 @admin.register(AboutSection)
 class AboutAdmin(admin.ModelAdmin):
@@ -23,9 +23,25 @@ class UserAdmin(BaseUserAdmin):
 
 @admin.register(Driver)
 class DriverAdmin(admin.ModelAdmin):
-    list_display = ('user', 'vehicle_details', 'is_available', 'current_latitude', 'current_longitude')
-    list_filter = ('is_available',)
+    list_display = ('user', 'vehicle_details', 'is_available', 'is_active', 'current_latitude', 'current_longitude', 'last_location_update')
+    list_filter = ('is_available', 'is_active', 'last_location_update')
     search_fields = ('user__username', 'user__email', 'vehicle_details')
+    readonly_fields = ('last_location_update', 'last_route_update')
+    
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('user', 'vehicle_details')
+        }),
+        ('Status', {
+            'fields': ('is_available', 'is_active')
+        }),
+        ('Location Tracking', {
+            'fields': ('current_latitude', 'current_longitude', 'last_location_update', 'location_accuracy')
+        }),
+        ('Performance', {
+            'fields': ('total_distance_today', 'last_route_update')
+        }),
+    )
 
 
 @admin.register(Parcel)
@@ -61,10 +77,28 @@ class TrackingEventAdmin(admin.ModelAdmin):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    list_display = ('parcel', 'driver', 'job_type', 'status', 'assigned_at', 'accepted_at', 'completed_at')
-    list_filter = ('job_type', 'status', 'assigned_at')
+    list_display = ('parcel', 'driver', 'job_type', 'status', 'assigned_at', 'accepted_at', 'completed_at', 'customer_tracking_enabled')
+    list_filter = ('job_type', 'status', 'assigned_at', 'customer_tracking_enabled', 'location_access_enabled')
     search_fields = ('parcel__tracking_number', 'driver__user__username')
     readonly_fields = ('assigned_at',)
+    
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('parcel', 'driver', 'job_type', 'status')
+        }),
+        ('Timing', {
+            'fields': ('assigned_at', 'accepted_at', 'completed_at', 'estimated_arrival_time')
+        }),
+        ('Route Management', {
+            'fields': ('route_started_at', 'route_completed_at', 'estimated_distance', 'actual_distance', 'route_waypoints')
+        }),
+        ('Tracking Permissions', {
+            'fields': ('location_access_enabled', 'customer_tracking_enabled', 'tracking_start_time', 'tracking_end_time')
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+    )
 
 
 @admin.register(Notification)
@@ -73,4 +107,54 @@ class NotificationAdmin(admin.ModelAdmin):
     list_filter = ('is_read', 'created_at')
     search_fields = ('user__username', 'title', 'message')
     readonly_fields = ('created_at',)
+
+
+
+
+@admin.register(DriverLocationHistory)
+class DriverLocationHistoryAdmin(admin.ModelAdmin):
+    list_display = ('driver', 'latitude', 'longitude', 'timestamp', 'accuracy', 'speed', 'current_job')
+    list_filter = ('timestamp', 'driver', 'current_job')
+    search_fields = ('driver__user__username', 'current_job__parcel__tracking_number')
+    readonly_fields = ('timestamp',)
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Location Data', {
+            'fields': ('driver', 'latitude', 'longitude', 'timestamp', 'accuracy')
+        }),
+        ('Movement Data', {
+            'fields': ('speed', 'heading')
+        }),
+        ('Job Association', {
+            'fields': ('current_job',)
+        }),
+    )
+
+
+@admin.register(Route)
+class RouteAdmin(admin.ModelAdmin):
+    list_display = ('route_name', 'route_area', 'depot', 'driver', 'status', 'started_at', 'completed_at')
+    list_filter = ('status', 'route_area', 'depot', 'started_at', 'completed_at')
+    search_fields = ('route_name', 'route_area', 'depot', 'driver__user__username')
+    readonly_fields = ('created_at', 'updated_at')
+    date_hierarchy = 'created_at'
+    
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('route_name', 'route_area', 'depot', 'driver', 'status')
+        }),
+        ('Planning', {
+            'fields': ('planned_stops', 'estimated_duration', 'estimated_distance')
+        }),
+        ('Execution', {
+            'fields': ('started_at', 'completed_at', 'actual_duration', 'actual_distance')
+        }),
+        ('Optimization', {
+            'fields': ('optimized_order', 'optimization_score')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at', 'updated_at')
+        }),
+    )
 

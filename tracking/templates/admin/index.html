@@ -1,0 +1,838 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_urls %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+.admin-dashboard {
+    background: #f8fafc;
+    min-height: 100vh;
+    padding: 0;
+}
+
+.dashboard-header {
+    background: white;
+    padding: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 2rem;
+}
+
+.dashboard-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.dashboard-subtitle {
+    color: #6b7280;
+    font-size: 1rem;
+    margin: 0.5rem 0 0 0;
+    font-weight: 400;
+}
+
+.quick-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.quick-action {
+    background: #6366f1;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 12px;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: none;
+    cursor: pointer;
+}
+
+.quick-action:hover {
+    background: #8b5cf6;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(99, 102, 241, 0.3);
+    color: white;
+    text-decoration: none;
+}
+
+.quick-action.secondary {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.quick-action.secondary:hover {
+    background: #e5e7eb;
+    color: #374151;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    margin-bottom: 2rem;
+    padding: 0 2rem;
+}
+
+.stats-section {
+    grid-column: 1 / -1;
+    margin-bottom: 2rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.stat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: white;
+}
+
+.stat-icon.primary { background: #6366f1; }
+.stat-icon.success { background: #10b981; }
+.stat-icon.warning { background: #f59e0b; }
+.stat-icon.danger { background: #ef4444; }
+
+.stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #1f2937;
+    margin: 0;
+    line-height: 1;
+}
+
+.stat-label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0 0;
+    font-weight: 500;
+}
+
+.stat-change {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.stat-change.positive {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.stat-change.negative {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.main-content {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.content-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+}
+
+.content-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1f2937;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.live-tracking-section {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.tracking-map {
+    height: 400px;
+    width: 100%;
+}
+
+.driver-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.driver-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #f3f4f6;
+    transition: background 0.2s ease;
+}
+
+.driver-item:hover {
+    background: #f9fafb;
+}
+
+.driver-item:last-child {
+    border-bottom: none;
+}
+
+.driver-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6366f1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 600;
+    position: relative;
+}
+
+.driver-status-dot {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.driver-status-dot.online { background: #10b981; }
+.driver-status-dot.busy { background: #f59e0b; }
+.driver-status-dot.offline { background: #9ca3af; }
+
+.driver-info h4 {
+    margin: 0;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.driver-info p {
+    margin: 0.125rem 0 0 0;
+    font-size: 0.75rem;
+    color: #6b7280;
+}
+
+.tracking-controls {
+    padding: 1.5rem;
+    background: #f9fafb;
+    border-top: 1px solid #e5e7eb;
+}
+
+.control-group {
+    margin-bottom: 1rem;
+}
+
+.control-group:last-child {
+    margin-bottom: 0;
+}
+
+.control-label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-select,
+.form-control {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    transition: border-color 0.2s ease;
+}
+
+.form-select:focus,
+.form-control:focus {
+    outline: none;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.btn-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    color: #374151;
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+
+.btn:hover {
+    background: #f9fafb;
+}
+
+.btn.primary {
+    background: #6366f1;
+    color: white;
+    border-color: #6366f1;
+}
+
+.btn.primary:hover {
+    background: #8b5cf6;
+    border-color: #8b5cf6;
+}
+
+.connection-status {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.connection-status.connected {
+    background: #10b981;
+    color: white;
+}
+
+.connection-status.disconnected {
+    background: #ef4444;
+    color: white;
+}
+
+.loading-spinner {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #6366f1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        padding: 0 1rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    
+    .dashboard-header {
+        padding: 1rem;
+    }
+    
+    .quick-actions {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admin-dashboard">
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">
+            <i class="fas fa-tachometer-alt"></i>
+            CPS Admin Dashboard
+        </h1>
+        <p class="dashboard-subtitle">Manage your courier and parcel service operations</p>
+        
+        <div class="quick-actions">
+            <a href="{% url 'live_tracking_dashboard' %}" class="quick-action">
+                <i class="fas fa-map-marked-alt"></i>
+                Live Tracking
+            </a>
+            <a href="{% url 'enhanced_parcel_tracking' %}" class="quick-action secondary">
+                <i class="fas fa-search"></i>
+                Track Parcel
+            </a>
+            <button class="quick-action secondary" onclick="refreshDashboard()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistics Section -->
+    <div class="stats-section">
+        <div class="stats-grid" style="padding: 0 2rem;">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon primary">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div class="stat-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +12%
+                    </div>
+                </div>
+                <h3 class="stat-value" id="totalDrivers">{{ total_drivers|default:0 }}</h3>
+                <p class="stat-label">Total Drivers</p>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon success">
+                        <i class="fas fa-user-check"></i>
+                    </div>
+                    <div class="stat-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +8%
+                    </div>
+                </div>
+                <h3 class="stat-value" id="activeDrivers">{{ active_drivers|default:0 }}</h3>
+                <p class="stat-label">Active Drivers</p>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon warning">
+                        <i class="fas fa-box"></i>
+                    </div>
+                    <div class="stat-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +24%
+                    </div>
+                </div>
+                <h3 class="stat-value" id="totalParcels">{{ total_parcels|default:0 }}</h3>
+                <p class="stat-label">Total Parcels</p>
+            </div>
+
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div class="stat-icon danger">
+                        <i class="fas fa-truck"></i>
+                    </div>
+                    <div class="stat-change negative">
+                        <i class="fas fa-arrow-down"></i>
+                        -3%
+                    </div>
+                </div>
+                <h3 class="stat-value" id="inTransit">{{ in_transit|default:0 }}</h3>
+                <p class="stat-label">In Transit</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Grid -->
+    <div class="dashboard-grid">
+        <!-- Live Tracking Section -->
+        <div class="live-tracking-section">
+            <div class="content-header">
+                <h3 class="content-title">
+                    <i class="fas fa-satellite-dish"></i>
+                    Live Driver Tracking
+                </h3>
+            </div>
+            <div id="trackingMap" class="tracking-map"></div>
+            <div class="tracking-controls">
+                <div class="control-group">
+                    <label class="control-label">Update Frequency</label>
+                    <select class="form-select" id="updateFrequency">
+                        <option value="15">Every 15 seconds</option>
+                        <option value="30" selected>Every 30 seconds</option>
+                        <option value="60">Every minute</option>
+                    </select>
+                </div>
+                <div class="btn-group">
+                    <button class="btn primary" id="refreshMap">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh
+                    </button>
+                    <button class="btn" id="fitAllDrivers">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                        Fit All
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Drivers Section -->
+        <div class="live-tracking-section">
+            <div class="content-header">
+                <h3 class="content-title">
+                    <i class="fas fa-users"></i>
+                    Active Drivers
+                </h3>
+            </div>
+            <div class="driver-list" id="driverList">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Modules Section -->
+    <div style="padding: 0 2rem 2rem;">
+        <div class="main-content">
+            <div class="content-header">
+                <h3 class="content-title">
+                    <i class="fas fa-cogs"></i>
+                    Administration
+                </h3>
+            </div>
+            <div style="padding: 1.5rem;">
+                {% if app_list %}
+                    <div class="dashboard">
+                        {% for app in app_list %}
+                            <div class="module">
+                                <h2>
+                                    <a href="{{ app.app_url }}" class="section" title="{% blocktranslate with name=app.name %}Models in the {{ name }} application{% endblocktranslate %}">
+                                        {{ app.name }}
+                                    </a>
+                                </h2>
+                                {% for model in app.models %}
+                                    <h3><a href="{{ model.admin_url }}">{{ model.name }}</a></h3>
+                                    <ul>
+                                        {% if model.add_url %}
+                                            <li><a href="{{ model.add_url }}" class="addlink">{% blocktranslate with name=model.name %}Add {{ name }}{% endblocktranslate %}</a></li>
+                                        {% endif %}
+                                        {% if model.admin_url %}
+                                            {% if model.view_only %}
+                                                <li><a href="{{ model.admin_url }}" class="viewlink">{% blocktranslate with name=model.name %}View {{ name }}{% endblocktranslate %}</a></li>
+                                            {% else %}
+                                                <li><a href="{{ model.admin_url }}" class="changelink">{% blocktranslate with name=model.name %}Change {{ name }}{% endblocktranslate %}</a></li>
+                                            {% endif %}
+                                        {% endif %}
+                                    </ul>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p>{% translate "You don't have permission to view or edit anything." %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Status -->
+<div id="connectionStatus" class="connection-status disconnected" style="display: none;">
+    <i class="fas fa-wifi"></i>
+    <span>Connecting...</span>
+</div>
+
+<script>
+class AdminDashboard {
+    constructor() {
+        this.map = null;
+        this.websocket = null;
+        this.drivers = [];
+        this.markers = {};
+        this.updateInterval = null;
+        
+        this.init();
+    }
+
+    init() {
+        this.bindEvents();
+        this.loadDashboardData();
+        this.initializeWebSocket();
+        this.initializeMap();
+    }
+
+    bindEvents() {
+        // Map controls
+        document.getElementById('refreshMap')?.addEventListener('click', () => {
+            this.updateDriverLocations();
+        });
+
+        document.getElementById('fitAllDrivers')?.addEventListener('click', () => {
+            this.fitAllDrivers();
+        });
+
+        document.getElementById('updateFrequency')?.addEventListener('change', (e) => {
+            this.setUpdateFrequency(parseInt(e.target.value));
+        });
+    }
+
+    initializeMap() {
+        if (this.map) return;
+
+        this.map = L.map('trackingMap').setView([51.505, -0.09], 13);
+        
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(this.map);
+
+        this.updateDriverLocations();
+        this.setUpdateFrequency(30);
+    }
+
+    async loadDashboardData() {
+        try {
+            const response = await fetch('/api/admin/analytics/');
+            const data = await response.json();
+            
+            this.updateStatistics(data);
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+        }
+    }
+
+    updateStatistics(data) {
+        if (data.drivers) {
+            document.getElementById('totalDrivers').textContent = data.drivers.total || 0;
+            document.getElementById('activeDrivers').textContent = data.drivers.active || 0;
+        }
+        
+        if (data.parcels) {
+            document.getElementById('totalParcels').textContent = data.parcels.total_today || 0;
+            document.getElementById('inTransit').textContent = data.parcels.in_transit || 0;
+        }
+    }
+
+    async updateDriverLocations() {
+        try {
+            const response = await fetch('/api/drivers/locations/');
+            const data = await response.json();
+            
+            this.drivers = data.drivers || [];
+            this.updateDriverMarkers();
+            this.updateDriverList();
+        } catch (error) {
+            console.error('Failed to update driver locations:', error);
+        }
+    }
+
+    updateDriverMarkers() {
+        if (!this.map) return;
+
+        // Clear existing markers
+        Object.values(this.markers).forEach(marker => {
+            this.map.removeLayer(marker);
+        });
+        this.markers = {};
+
+        // Add new markers
+        this.drivers.forEach(driver => {
+            if (driver.location) {
+                const marker = L.marker([driver.location.latitude, driver.location.longitude])
+                    .addTo(this.map)
+                    .bindPopup(`
+                        <div>
+                            <strong>${driver.name}</strong><br>
+                            Status: ${driver.status}<br>
+                            Last update: ${new Date(driver.location.last_update).toLocaleTimeString()}
+                        </div>
+                    `);
+                
+                this.markers[driver.id] = marker;
+            }
+        });
+    }
+
+    updateDriverList() {
+        const driverList = document.getElementById('driverList');
+        if (!driverList) return;
+
+        if (this.drivers.length === 0) {
+            driverList.innerHTML = `
+                <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                    <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                    <p>No active drivers found</p>
+                </div>
+            `;
+            return;
+        }
+
+        driverList.innerHTML = this.drivers.map(driver => `
+            <div class="driver-item">
+                <div class="driver-avatar">
+                    ${driver.name.charAt(0).toUpperCase()}
+                    <div class="driver-status-dot ${driver.status}"></div>
+                </div>
+                <div class="driver-info">
+                    <h4>${driver.name}</h4>
+                    <p>${driver.status} • ${driver.location ? 'GPS Active' : 'No GPS'}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    fitAllDrivers() {
+        if (!this.map || this.drivers.length === 0) return;
+
+        const group = new L.featureGroup(Object.values(this.markers));
+        this.map.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    setUpdateFrequency(seconds) {
+        if (this.updateInterval) {
+            clearInterval(this.updateInterval);
+        }
+
+        this.updateInterval = setInterval(() => {
+            this.updateDriverLocations();
+        }, seconds * 1000);
+    }
+
+    initializeWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/tracking/admin/`;
+        
+        this.websocket = new WebSocket(wsUrl);
+        
+        this.websocket.onopen = () => {
+            this.updateConnectionStatus(true);
+        };
+        
+        this.websocket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            this.handleWebSocketMessage(data);
+        };
+        
+        this.websocket.onclose = () => {
+            this.updateConnectionStatus(false);
+            // Attempt to reconnect after 5 seconds
+            setTimeout(() => this.initializeWebSocket(), 5000);
+        };
+        
+        this.websocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus(false);
+        };
+    }
+
+    handleWebSocketMessage(data) {
+        if (data.type === 'driver_location_update') {
+            this.updateDriverLocations();
+        } else if (data.type === 'statistics_update') {
+            this.updateStatistics(data.data);
+        }
+    }
+
+    updateConnectionStatus(connected) {
+        const statusEl = document.getElementById('connectionStatus');
+        if (connected) {
+            statusEl.className = 'connection-status connected';
+            statusEl.innerHTML = '<i class="fas fa-wifi"></i><span>Connected</span>';
+            statusEl.style.display = 'flex';
+            setTimeout(() => statusEl.style.display = 'none', 3000);
+        } else {
+            statusEl.className = 'connection-status disconnected';
+            statusEl.innerHTML = '<i class="fas fa-wifi"></i><span>Disconnected</span>';
+            statusEl.style.display = 'flex';
+        }
+    }
+}
+
+// Global functions
+function refreshDashboard() {
+    if (window.adminDashboard) {
+        window.adminDashboard.loadDashboardData();
+        window.adminDashboard.updateDriverLocations();
+    }
+}
+
+// Initialize dashboard when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    window.adminDashboard = new AdminDashboard();
+});
+</script>
+{% endblock %}
+

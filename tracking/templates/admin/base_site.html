@@ -1,0 +1,45 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | CPS Admin Dashboard{% endblock %}
+
+{% block branding %}
+<h1 id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <i class="fas fa-shipping-fast" style="margin-right: 0.5rem;"></i>
+        CPS Admin Dashboard
+    </a>
+</h1>
+{% endblock %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom Admin CSS -->
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/custom_admin.css' %}">
+    
+    <!-- Custom JavaScript -->
+    <script src="{% static 'admin/js/custom_admin.js' %}" defer></script>
+{% endblock %}
+
+{% block nav-global %}
+    {{ block.super }}
+    <div style="position: absolute; top: 1rem; right: 1rem; z-index: 1000;">
+        <a href="{% url 'live_tracking_dashboard' %}" class="button" style="margin-right: 0.5rem;">
+            <i class="fas fa-map-marked-alt"></i>
+            Live Tracking
+        </a>
+        <a href="{% url 'enhanced_admin_dashboard' %}" class="button">
+            <i class="fas fa-chart-line"></i>
+            Dashboard
+        </a>
+    </div>
+{% endblock %}
+

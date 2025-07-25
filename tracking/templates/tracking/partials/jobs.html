@@ -1,5 +1,12 @@
 <h3 class="text-xl font-bold mb-4 text-white">Manage Jobs</h3>
 
+<div class="mb-4">
+  <div class="alert alert-info">
+    <h6><i class="fas fa-info-circle me-2"></i>Customer Tracking Controls</h6>
+    <p class="mb-0">Use the tracking controls below to enable/disable customer access to driver locations for specific jobs.</p>
+  </div>
+</div>
+
 <table class="min-w-full bg-white/10 backdrop-blur text-white text-sm rounded-xl overflow-hidden shadow-lg">
   <thead class="bg-gradient-to-r from-purple-700 to-indigo-800 text-white">
     <tr>
@@ -7,6 +14,7 @@
       <th class="px-4 py-3">Driver</th>
       <th class="px-4 py-3">Type</th>
       <th class="px-4 py-3">Status</th>
+      <th class="px-4 py-3">Customer Tracking</th>
       <th class="px-4 py-3">Action</th>
     </tr>
   </thead>
@@ -15,7 +23,11 @@
     <tr class="border-b border-white/10 hover:bg-white/10 transition">
       <form method="post" action="{% url 'update_job_inline' job.id %}">
         {% csrf_token %}
-        <td class="px-4 py-2">{{ job.parcel.tracking_number }}</td>
+        <td class="px-4 py-2">
+          <strong>{{ job.parcel.tracking_number }}</strong>
+          <br>
+          <small class="text-gray-300">{{ job.parcel.customer.username }}</small>
+        </td>
 
         <td class="px-4 py-2">
           <select name="driver" class="w-full bg-gray-800 text-white rounded px-2 py-1">
@@ -29,24 +41,46 @@
 
         <td class="px-4 py-2">
           <select name="type" class="w-full bg-gray-800 text-white rounded px-2 py-1">
-            <option value="pickup" {% if job.type == 'pickup' %}selected{% endif %}>Pickup</option>
-            <option value="delivery" {% if job.type == 'delivery' %}selected{% endif %}>Delivery</option>
-            {% comment %} <option value="return" {% if job.type == 'return' %}selected{% endif %}>Return</option> {% endcomment %}
+            <option value="pickup" {% if job.job_type == 'pickup' %}selected{% endif %}>Pickup</option>
+            <option value="delivery" {% if job.job_type == 'delivery' %}selected{% endif %}>Delivery</option>
           </select>
         </td>
 
         <td class="px-4 py-2">
           <select name="status" class="w-full bg-gray-800 text-white rounded px-2 py-1">
             <option value="assigned" {% if job.status == 'assigned' %}selected{% endif %}>Assigned</option>
-            <option value="in_progress" {% if job.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+            <option value="accepted" {% if job.status == 'accepted' %}selected{% endif %}>Accepted</option>
+            <option value="en_route" {% if job.status == 'en_route' %}selected{% endif %}>En Route</option>
             <option value="completed" {% if job.status == 'completed' %}selected{% endif %}>Completed</option>
-            <option value="cancelled" {% if job.status == 'cancelled' %}selected{% endif %}>Cancelled</option>
+            <option value="failed" {% if job.status == 'failed' %}selected{% endif %}>Failed</option>
           </select>
         </td>
 
         <td class="px-4 py-2 text-center">
+          {% if job.customer_tracking_enabled %}
+            <span class="badge bg-success">
+              <i class="fas fa-eye me-1"></i>Enabled
+            </span>
+            <br>
+            <button type="button" class="btn btn-sm btn-outline-warning mt-1" 
+                    onclick="toggleCustomerTracking({{ job.id }}, false)">
+              <i class="fas fa-eye-slash me-1"></i>Disable
+            </button>
+          {% else %}
+            <span class="badge bg-secondary">
+              <i class="fas fa-eye-slash me-1"></i>Disabled
+            </span>
+            <br>
+            <button type="button" class="btn btn-sm btn-outline-success mt-1" 
+                    onclick="toggleCustomerTracking({{ job.id }}, true)">
+              <i class="fas fa-eye me-1"></i>Enable
+            </button>
+          {% endif %}
+        </td>
+
+        <td class="px-4 py-2 text-center">
           <button type="submit" class="bg-green-600 hover:bg-green-700 text-white px-4 py-1 rounded shadow">
-            Save
+            <i class="fas fa-save me-1"></i>Save
           </button>
         </td>
       </form>
@@ -54,3 +88,46 @@
     {% endfor %}
   </tbody>
 </table>
+
+<script>
+async function toggleCustomerTracking(jobId, enable) {
+  try {
+    const response = await fetch(`/api/admin/job/${jobId}/enable-tracking/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+      },
+      body: JSON.stringify({
+        enable_tracking: enable
+      })
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      
+      // Show success message
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert alert-success alert-dismissible fade show';
+      alertDiv.innerHTML = `
+        <i class="fas fa-check-circle me-2"></i>${data.message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      `;
+      
+      // Insert alert at the top of the jobs section
+      const jobsSection = document.querySelector('#jobs');
+      jobsSection.insertBefore(alertDiv, jobsSection.firstChild);
+      
+      // Reload the page to update the UI
+      setTimeout(() => {
+        location.reload();
+      }, 1500);
+    } else {
+      alert('Failed to update customer tracking setting');
+    }
+  } catch (error) {
+    console.error('Error toggling customer tracking:', error);
+    alert('Error updating customer tracking setting');
+  }
+}
+</script>

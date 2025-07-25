@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Driver Tracking Dashboard - CPS</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #6366f1;
+            --secondary-color: #8b5cf6;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --dark-color: #1f2937;
+            --light-color: #f8fafc;
+            --border-color: #e5e7eb;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            min-height: 100vh;
+        }
+
+        .dashboard-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            overflow: hidden;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .dashboard-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .dashboard-title {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            font-size: 2.5rem;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .dashboard-subtitle {
+            position: relative;
+            z-index: 1;
+            margin: 0.5rem 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            padding: 2rem;
+            background: white;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        }
+
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+            color: var(--dark-color);
+        }
+
+        .stat-label {
+            color: #6b7280;
+            font-size: 0.9rem;
+            margin: 0.5rem 0 0 0;
+            font-weight: 500;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+            padding: 2rem;
+            background: white;
+        }
+
+        .map-container {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+            position: relative;
+        }
+
+        .map-header {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .map-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--dark-color);
+        }
+
+        .map-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .control-btn {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .control-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .control-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+
+        .sidebar {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+
+        .sidebar-header {
+            background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+            color: var(--dark-color);
+        }
+
+        .drivers-list {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .driver-card {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .driver-card:hover {
+            background: #e2e8f0;
+            transform: translateX(4px);
+        }
+
+        .driver-card.selected {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .driver-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .driver-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .driver-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        .status-active {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-inactive {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+
+        .driver-details {
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .driver-card.selected .driver-details {
+            opacity: 0.9;
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        .status-connected {
+            background: rgba(16, 185, 129, 0.9);
+            color: white;
+        }
+
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+        }
+
+        .route-info {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .route-title {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--dark-color);
+        }
+
+        .route-details {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 1rem;
+                padding: 1rem;
+            }
+            
+            .dashboard-header {
+                padding: 1.5rem;
+            }
+            
+            .dashboard-title {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="connection-status status-disconnected">
+        <i class="fas fa-wifi"></i> Connecting...
+    </div>
+
+    <div class="dashboard-container">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">
+                <i class="fas fa-map-marked-alt"></i>
+                Live Driver Tracking
+            </h1>
+            <p class="dashboard-subtitle">Real-time monitoring and route management</p>
+        </div>
+
+        <!-- Statistics Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: var(--primary-color);">
+                    <i class="fas fa-users"></i>
+                </div>
+                <h3 class="stat-value" id="totalDrivers">-</h3>
+                <p class="stat-label">Total Drivers</p>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success-color);">
+                    <i class="fas fa-user-check"></i>
+                </div>
+                <h3 class="stat-value" id="activeDrivers">-</h3>
+                <p class="stat-label">Active Drivers</p>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning-color);">
+                    <i class="fas fa-route"></i>
+                </div>
+                <h3 class="stat-value" id="activeJobs">-</h3>
+                <p class="stat-label">Active Jobs</p>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: var(--secondary-color);">
+                    <i class="fas fa-box"></i>
+                </div>
+                <h3 class="stat-value" id="inTransitParcels">-</h3>
+                <p class="stat-label">In Transit</p>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Map Container -->
+            <div class="map-container">
+                <div class="map-header">
+                    <h3 class="map-title">
+                        <i class="fas fa-map"></i>
+                        Driver Locations
+                    </h3>
+                    <div class="map-controls">
+                        <button class="control-btn active" id="showAllBtn">
+                            <i class="fas fa-eye"></i>
+                            Show All
+                        </button>
+                        <button class="control-btn" id="showActiveBtn">
+                            <i class="fas fa-running"></i>
+                            Active Only
+                        </button>
+                        <button class="control-btn" id="refreshBtn">
+                            <i class="fas fa-sync-alt"></i>
+                            Refresh
+                        </button>
+                    </div>
+                </div>
+                <div id="map"></div>
+            </div>
+
+            <!-- Sidebar -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h3 class="sidebar-title">
+                        <i class="fas fa-list"></i>
+                        Active Drivers
+                    </h3>
+                </div>
+                <div class="drivers-list" id="driversList">
+                    <div class="loading-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initDashboard" async defer></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        class LiveTrackingDashboard {
+            constructor() {
+                this.map = null;
+                this.drivers = new Map();
+                this.driverMarkers = new Map();
+                this.routePolylines = new Map();
+                this.selectedDriver = null;
+                this.websocket = null;
+                this.reconnectAttempts = 0;
+                this.maxReconnectAttempts = 5;
+                
+                this.init();
+            }
+
+            init() {
+                this.initMap();
+                this.initWebSocket();
+                this.bindEvents();
+                this.loadInitialData();
+            }
+
+            initMap() {
+                // Initialize Leaflet map
+                this.map = L.map('map').setView([51.505, -0.09], 10);
+                
+                // Add tile layer
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+
+                // Custom driver icon
+                this.driverIcon = L.divIcon({
+                    className: 'driver-marker',
+                    html: '<div style="background: #10b981; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                });
+
+                this.inactiveDriverIcon = L.divIcon({
+                    className: 'driver-marker-inactive',
+                    html: '<div style="background: #6b7280; width: 20px; height: 20px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+                    iconSize: [26, 26],
+                    iconAnchor: [13, 13]
+                });
+            }
+
+            initWebSocket() {
+                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                const wsUrl = `${protocol}//${window.location.host}/ws/tracking/admin/`;
+                
+                this.websocket = new WebSocket(wsUrl);
+                
+                this.websocket.onopen = () => {
+                    console.log('WebSocket connected');
+                    this.updateConnectionStatus(true);
+                    this.reconnectAttempts = 0;
+                };
+                
+                this.websocket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    this.handleWebSocketMessage(data);
+                };
+                
+                this.websocket.onclose = () => {
+                    console.log('WebSocket disconnected');
+                    this.updateConnectionStatus(false);
+                    this.attemptReconnect();
+                };
+                
+                this.websocket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                    this.updateConnectionStatus(false);
+                };
+            }
+
+            attemptReconnect() {
+                if (this.reconnectAttempts < this.maxReconnectAttempts) {
+                    this.reconnectAttempts++;
+                    console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+                    setTimeout(() => {
+                        this.initWebSocket();
+                    }, 3000 * this.reconnectAttempts);
+                }
+            }
+
+            updateConnectionStatus(connected) {
+                const statusEl = document.getElementById('connectionStatus');
+                if (connected) {
+                    statusEl.className = 'connection-status status-connected';
+                    statusEl.innerHTML = '<i class="fas fa-wifi"></i> Connected';
+                } else {
+                    statusEl.className = 'connection-status status-disconnected';
+                    statusEl.innerHTML = '<i class="fas fa-wifi"></i> Disconnected';
+                }
+            }
+
+            handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'initial_data':
+                        this.updateDrivers(data.drivers);
+                        break;
+                    case 'driver_location_update':
+                        this.updateDriverLocation(data);
+                        break;
+                    case 'driver_status_update':
+                        this.updateDriverStatus(data);
+                        break;
+                    case 'driver_details':
+                        this.showDriverDetails(data.driver);
+                        break;
+                    case 'driver_route':
+                        this.showDriverRoute(data.driver_id, data.route);
+                        break;
+                }
+            }
+
+            updateDrivers(driversData) {
+                this.drivers.clear();
+                this.clearMap();
+                
+                driversData.forEach(driver => {
+                    this.drivers.set(driver.id, driver);
+                    this.addDriverToMap(driver);
+                });
+                
+                this.updateDriversList();
+                this.updateStatistics();
+            }
+
+            updateDriverLocation(data) {
+                const driver = this.drivers.get(data.driver_id);
+                if (driver) {
+                    driver.latitude = data.latitude;
+                    driver.longitude = data.longitude;
+                    driver.last_update = data.timestamp;
+                    
+                    this.updateDriverMarker(driver);
+                }
+            }
+
+            updateDriverStatus(data) {
+                const driver = this.drivers.get(data.driver_id);
+                if (driver) {
+                    driver.is_active = data.is_active;
+                    driver.is_available = data.is_available;
+                    
+                    this.updateDriverMarker(driver);
+                    this.updateDriversList();
+                }
+            }
+
+            addDriverToMap(driver) {
+                if (driver.latitude && driver.longitude) {
+                    const icon = driver.is_active ? this.driverIcon : this.inactiveDriverIcon;
+                    const marker = L.marker([driver.latitude, driver.longitude], { icon })
+                        .addTo(this.map)
+                        .bindPopup(this.createDriverPopup(driver))
+                        .on('click', () => this.selectDriver(driver.id));
+                    
+                    this.driverMarkers.set(driver.id, marker);
+                }
+            }
+
+            updateDriverMarker(driver) {
+                const marker = this.driverMarkers.get(driver.id);
+                if (marker && driver.latitude && driver.longitude) {
+                    marker.setLatLng([driver.latitude, driver.longitude]);
+                    marker.setIcon(driver.is_active ? this.driverIcon : this.inactiveDriverIcon);
+                    marker.setPopupContent(this.createDriverPopup(driver));
+                }
+            }
+
+            createDriverPopup(driver) {
+                const lastUpdate = driver.last_update ? 
+                    new Date(driver.last_update).toLocaleTimeString() : 'Never';
+                
+                return `
+                    <div style="min-width: 200px;">
+                        <h6><strong>${driver.username}</strong></h6>
+                        <p><i class="fas fa-clock"></i> Last Update: ${lastUpdate}</p>
+                        <p><i class="fas fa-circle" style="color: ${driver.is_active ? '#10b981' : '#6b7280'}"></i> 
+                           ${driver.is_active ? 'Active' : 'Inactive'}</p>
+                        ${driver.current_job ? `
+                            <p><i class="fas fa-box"></i> Job: ${driver.current_job.parcel_tracking}</p>
+                        ` : ''}
+                        <button class="btn btn-sm btn-primary" onclick="dashboard.selectDriver(${driver.id})">
+                            View Details
+                        </button>
+                    </div>
+                `;
+            }
+
+            selectDriver(driverId) {
+                this.selectedDriver = driverId;
+                this.updateDriversList();
+                
+                // Request driver details
+                if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+                    this.websocket.send(JSON.stringify({
+                        type: 'get_driver_details',
+                        driver_id: driverId
+                    }));
+                    
+                    this.websocket.send(JSON.stringify({
+                        type: 'get_driver_route',
+                        driver_id: driverId
+                    }));
+                }
+            }
+
+            showDriverRoute(driverId, routeData) {
+                // Clear existing route
+                this.routePolylines.forEach(polyline => {
+                    this.map.removeLayer(polyline);
+                });
+                this.routePolylines.clear();
+                
+                if (routeData && routeData.waypoints && routeData.waypoints.length > 1) {
+                    const waypoints = routeData.waypoints.map(wp => [wp.latitude, wp.longitude]);
+                    
+                    const polyline = L.polyline(waypoints, {
+                        color: '#6366f1',
+                        weight: 4,
+                        opacity: 0.8
+                    }).addTo(this.map);
+                    
+                    this.routePolylines.set(driverId, polyline);
+                    
+                    // Fit map to route
+                    this.map.fitBounds(polyline.getBounds(), { padding: [20, 20] });
+                }
+            }
+
+            updateDriversList() {
+                const driversListEl = document.getElementById('driversList');
+                const activeDrivers = Array.from(this.drivers.values())
+                    .filter(driver => driver.is_active)
+                    .sort((a, b) => a.username.localeCompare(b.username));
+                
+                if (activeDrivers.length === 0) {
+                    driversListEl.innerHTML = `
+                        <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                            <i class="fas fa-users" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                            <p>No active drivers found</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                driversListEl.innerHTML = activeDrivers.map(driver => {
+                    const lastUpdate = driver.last_update ? 
+                        new Date(driver.last_update).toLocaleTimeString() : 'Never';
+                    
+                    return `
+                        <div class="driver-card ${this.selectedDriver === driver.id ? 'selected' : ''}" 
+                             onclick="dashboard.selectDriver(${driver.id})">
+                            <div class="driver-info">
+                                <span class="driver-name">${driver.username}</span>
+                                <span class="driver-status ${driver.is_active ? 'status-active' : 'status-inactive'}">
+                                    ${driver.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+                            <div class="driver-details">
+                                <div><i class="fas fa-clock"></i> ${lastUpdate}</div>
+                                ${driver.current_job ? `
+                                    <div><i class="fas fa-box"></i> ${driver.current_job.parcel_tracking}</div>
+                                ` : '<div><i class="fas fa-check"></i> Available</div>'}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            updateStatistics() {
+                const allDrivers = Array.from(this.drivers.values());
+                const activeDrivers = allDrivers.filter(d => d.is_active);
+                const driversWithJobs = activeDrivers.filter(d => d.current_job);
+                
+                document.getElementById('totalDrivers').textContent = allDrivers.length;
+                document.getElementById('activeDrivers').textContent = activeDrivers.length;
+                document.getElementById('activeJobs').textContent = driversWithJobs.length;
+                document.getElementById('inTransitParcels').textContent = driversWithJobs.length;
+            }
+
+            clearMap() {
+                this.driverMarkers.forEach(marker => {
+                    this.map.removeLayer(marker);
+                });
+                this.driverMarkers.clear();
+                
+                this.routePolylines.forEach(polyline => {
+                    this.map.removeLayer(polyline);
+                });
+                this.routePolylines.clear();
+            }
+
+            bindEvents() {
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.loadInitialData();
+                });
+                
+                document.getElementById('showAllBtn').addEventListener('click', (e) => {
+                    this.setActiveButton(e.target);
+                    this.showAllDrivers();
+                });
+                
+                document.getElementById('showActiveBtn').addEventListener('click', (e) => {
+                    this.setActiveButton(e.target);
+                    this.showActiveDriversOnly();
+                });
+            }
+
+            setActiveButton(button) {
+                document.querySelectorAll('.control-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                button.classList.add('active');
+            }
+
+            showAllDrivers() {
+                this.driverMarkers.forEach(marker => {
+                    marker.addTo(this.map);
+                });
+            }
+
+            showActiveDriversOnly() {
+                this.driverMarkers.forEach((marker, driverId) => {
+                    const driver = this.drivers.get(driverId);
+                    if (driver && driver.is_active) {
+                        marker.addTo(this.map);
+                    } else {
+                        this.map.removeLayer(marker);
+                    }
+                });
+            }
+
+            async loadInitialData() {
+                try {
+                    const response = await fetch('/api/admin/drivers/active/');
+                    const data = await response.json();
+                    
+                    if (data.drivers) {
+                        this.updateDrivers(data.drivers);
+                    }
+                } catch (error) {
+                    console.error('Failed to load initial data:', error);
+                }
+            }
+        }
+
+        // Initialize dashboard when page loads
+        let dashboard;
+        document.addEventListener('DOMContentLoaded', () => {
+            dashboard = new LiveTrackingDashboard();
+        });
+    </script>
+</body>
+</html>
+
